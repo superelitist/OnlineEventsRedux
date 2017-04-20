@@ -27,7 +27,6 @@ typedef struct
 	float h_;
 	DWORD _paddingw;
 } Vector4;
-// a change.
 
 #pragma warning(disable : 4244 4305) // double <-> float conversions
 
