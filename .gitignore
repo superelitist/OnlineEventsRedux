@@ -259,3 +259,11 @@ paket-files/
 # Python Tools for Visual Studio (PTVS)
 __pycache__/
 *.pyc
+/OnlineEvents/blah
+/OnlineEvents/blah/OnlineEvents.ipdb
+/OnlineEvents/blah/OnlineEvents.iobj
+/OnlineEvents/blah/OnlineEvents.asi
+/OnlineEvents/blah
+*.ipdb
+*.iobj
+*.asi
