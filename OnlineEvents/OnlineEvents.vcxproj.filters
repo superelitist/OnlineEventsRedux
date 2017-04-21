@@ -5,6 +5,7 @@
     <ClCompile Include="script.cpp" />
     <ClCompile Include="..\..\inc\INIReader.cpp" />
     <ClCompile Include="..\..\inc\INIWriter.cpp" />
+    <ClCompile Include="Log.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\inc\enums.h">
@@ -24,6 +25,9 @@
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="..\..\inc\INIWriter.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="Log.h">
       <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>

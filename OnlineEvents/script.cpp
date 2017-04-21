@@ -13,6 +13,7 @@
 #include <ctime>
 #include "iostream"
 #include <algorithm>
+#include "Log.h"
 //#include "keyboard.h"
 
 CIniReader reader(".\\OnlineEvents.ini");
@@ -30,18 +31,22 @@ typedef struct
 } Vector4;
 
 #pragma warning(disable : 4244 4305) // double <-> float conversions
+#pragma warning(disable : 4302)
 
 // int minute,
 int timer_start_minute, type_of_event;
 int missionTime = 0;
 int waitTime = 0;
-bool makeEvent = false;
+bool ready_to_prepare_mission = false;
 bool timer_is_started = false;
-bool eventMade = false;
+bool mission_is_prepared = false;
 bool eventOver = false;
 bool specialCrate = false;
 Ped playerPed;
 Player player;
+std::vector<Vector4> reserved_vehicle_spawn_points_parked;
+std::vector<Vector4> possible_vehicle_spawn_points_parked;
+std::vector<Hash> possible_vehicle_models;
 
 int beep, mission_end_delay_in_world_minutes, mission_start_delay_in_world_minutes, blipStyle;
 int seconds_to_wait_for_vehicle_persistence_scripts;
@@ -71,6 +76,18 @@ void GetSettingsFromIniFile() {
 	notify_number_of_reserved_spawn_points = reader.ReadInteger("Debug", "notify_number_of_reserved_spawn_points", false);
 	
 	
+}
+
+void InitialWaitForGame(int additional_seconds_to_wait)
+{
+	while (true)
+	{
+		if (!DLC2::GET_IS_LOADING_SCREEN_ACTIVE()) // hopefully this actually does what it says...
+			if (PLAYER::IS_PLAYER_PLAYING(player)) break; // wait for player to get a ped - which should already be true if the above is.
+		WAIT(0);
+	}
+	WAIT(additional_seconds_to_wait * 1000);
+	return;
 }
 
 bool DoesEntityExistAndIsNotNull(Entity entity) {
@@ -296,9 +313,8 @@ std::vector<Vector4> GetParkedCarsInRange(std::vector<Vector4> vector_of_vector4
 			}
 		}
 	}
+	return vector_of_vector4s;
 }
-
-std::vector<Vector4> reserved_vehicle_spawn_points_parked;
 
 void PreGatherReservedSpawnPoints()
 {
@@ -348,9 +364,6 @@ void PreGatherReservedSpawnPoints()
 		}
 	}
 }
-
-std::vector<Vector4> possible_vehicle_spawn_points_parked;
-std::vector<Hash> possible_vehicle_models;
 
 //void InitializeSpawnPoints() {
 //	possible_vehicle_spawn_points_parked.push_back(Vector4{ 254.46f, 84.91f, 99.57f, 250.01f });
@@ -469,7 +482,7 @@ void PrepareCollectibleVehicleMission()
 	}
 	UI::SET_BLIP_COLOUR(vehicle_blip, 5);
 	UI::SET_BLIP_DISPLAY(vehicle_blip, (char)"you will never see this");
-	eventMade = true;
+	mission_is_prepared = true;
 	type_of_event = 1;
 	NotifyAboveMap("A ~y~special vehicle~w~ has been requested for pickup.");
 	if (beep == 1) PlayNotificationBeep();
@@ -490,7 +503,7 @@ Blip dropOff;
 
 void vehicle_collection_mission()
 {
-	if (eventMade && type_of_event == 1)
+	if (mission_is_prepared && type_of_event == 1)
 	{
 		Vector3 position = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
 		Vector3 vehiclePos = ENTITY::GET_ENTITY_COORDS(collectible_vehicle, 0);
@@ -538,12 +551,12 @@ void vehicle_collection_mission()
 			resprayed = true;
 		}
 
-		if (resprayed && eventMade)
+		if (resprayed && mission_is_prepared)
 		{
 			GRAPHICS::DRAW_MARKER(1, 1226.06, -3231.36, 4.9, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 5.0f, 5.0f, 1.0f, 204, 204, 0, 100, false, false, 2, false, false, false, false);
 		}
 
-		if (dropOffDistance < 0.7f && PED::IS_PED_IN_VEHICLE(playerPed, collectible_vehicle, 0) && resprayed && eventMade)
+		if (dropOffDistance < 0.7f && PED::IS_PED_IN_VEHICLE(playerPed, collectible_vehicle, 0) && resprayed && mission_is_prepared)
 		{
 			VEHICLE::SET_VEHICLE_FORWARD_SPEED(collectible_vehicle, 0.0f);
 			while (ENTITY::GET_ENTITY_SPEED(collectible_vehicle) != 0)
@@ -557,7 +570,7 @@ void vehicle_collection_mission()
 			UI::REMOVE_BLIP(&dropOff);
 			UI::REMOVE_BLIP(&vehicle_blip);
 			ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&collectible_vehicle);
-			eventMade = false;
+			mission_is_prepared = false;
 			wantedSet = false;
 			gotColor = false;
 			resprayed = false;
@@ -566,7 +579,7 @@ void vehicle_collection_mission()
 			missionTime = 0;
 		}
 
-		if (!VEHICLE::IS_VEHICLE_DRIVEABLE(collectible_vehicle, 1) && eventMade)
+		if (!VEHICLE::IS_VEHICLE_DRIVEABLE(collectible_vehicle, 1) && mission_is_prepared)
 		{
 			NotifyAboveMap("The ~y~special vehicle~w~ has been destroyed.");
 			if (beep == 1)
@@ -577,7 +590,7 @@ void vehicle_collection_mission()
 
 			UI::REMOVE_BLIP(&vehicle_blip);
 			ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&collectible_vehicle);
-			eventMade = false;
+			mission_is_prepared = false;
 			wantedSet = false;
 			gotColor = false;
 			resprayed = false;
@@ -586,7 +599,7 @@ void vehicle_collection_mission()
 			missionTime = 0;
 		}
 
-		if (eventOver && vehicleDistance > collection_mission_minimum_range_for_timeout || eventMade && ENTITY::IS_ENTITY_DEAD(playerPed))
+		if (eventOver && vehicleDistance > collection_mission_minimum_range_for_timeout || mission_is_prepared && ENTITY::IS_ENTITY_DEAD(playerPed))
 		{
 			NotifyAboveMap("The ~y~special vehicle~w~ is no longer requested.");
 			if (beep == 1)
@@ -597,7 +610,7 @@ void vehicle_collection_mission()
 
 			UI::REMOVE_BLIP(&vehicle_blip);
 			ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&collectible_vehicle);
-			eventMade = false;
+			mission_is_prepared = false;
 			wantedSet = false;
 			gotColor = false;
 			resprayed = false;
@@ -611,7 +624,7 @@ void vehicle_collection_mission()
 Vehicle smugglerVehicle;
 Blip smugglerBlip;
 
-void arms_smuggler_spawn()
+void PrepareDestroyVehicleMission()
 {
 	Vector3 spawn;
 	DWORD vehicle;
@@ -728,7 +741,7 @@ void arms_smuggler_spawn()
 	}
 	UI::SET_BLIP_COLOUR(smugglerBlip, 1);
 	UI::SET_BLIP_DISPLAY(smugglerBlip, (char)"you will never see this");
-	eventMade = true;
+	mission_is_prepared = true;
 	type_of_event = 2;
 	NotifyAboveMap("A ~r~smuggler vehicle~w~ has been spotted.  Destroy it for a reward.");
 	if (beep == 1)
@@ -737,13 +750,13 @@ void arms_smuggler_spawn()
 
 void arms_smuggler_mission()
 {
-	if (eventMade && type_of_event == 2)
+	if (mission_is_prepared && type_of_event == 2)
 	{
 		Vector3 position = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
 		Vector3 vehiclePos = ENTITY::GET_ENTITY_COORDS(smugglerVehicle, 0);
 		int vehicleDistance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(vehiclePos.x, vehiclePos.y, vehiclePos.z, position.x, position.y, position.z, 0);
 
-		if (!VEHICLE::IS_VEHICLE_DRIVEABLE(smugglerVehicle, 1) && eventMade)
+		if (!VEHICLE::IS_VEHICLE_DRIVEABLE(smugglerVehicle, 1) && mission_is_prepared)
 		{
 			money_math();
 			UI::REMOVE_BLIP(&smugglerBlip);
@@ -751,19 +764,19 @@ void arms_smuggler_mission()
 			NotifyAboveMap("Vehicle destroyed.\nReward: ~g~$1000~w~");
 			if (beep == 1)
 				PlayNotificationBeep();
-			eventMade = false;
+			mission_is_prepared = false;
 			eventOver = false;
 			missionTime = 0;
 		}
 
-		if (eventOver && vehicleDistance > 1000 || eventMade && ENTITY::IS_ENTITY_DEAD(playerPed))
+		if (eventOver && vehicleDistance > 1000 || mission_is_prepared && ENTITY::IS_ENTITY_DEAD(playerPed))
 		{
 			NotifyAboveMap("The ~r~smuggler vehicle~w~ has been claimed by smugglers.");
 			if (beep == 1)
 				PlayNotificationBeep();
 			UI::REMOVE_BLIP(&smugglerBlip);
 			ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&smugglerVehicle);
-			eventMade = false;
+			mission_is_prepared = false;
 			eventOver = false;
 			missionTime = 0;
 		}
@@ -773,7 +786,7 @@ void arms_smuggler_mission()
 Blip crateBlip;
 Vector3 crateSpawn;
 
-void crate_drop_spawn()
+void PrepareCrateDropMission()
 {
 	while (true)
 	{
@@ -868,7 +881,7 @@ void crate_drop_spawn()
 		NotifyAboveMap("A ~g~crate~w~ has been dropped.");
 	if (beep == 1)
 		PlayNotificationBeep();
-	eventMade = true;
+	mission_is_prepared = true;
 	type_of_event = 3;
 }
 
@@ -879,7 +892,7 @@ Ped guard1, guard2, guard3, guard4, guard5, guard6, guard7, guard8, guard9, guar
 
 void crate_drop_mission()
 {
-	if (eventMade && type_of_event == 3)
+	if (mission_is_prepared && type_of_event == 3)
 	{
 		Vector3 position = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
 		int spawnDistance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(position.x, position.y, position.z, crateSpawn.x, crateSpawn.y, crateSpawn.z, 0);
@@ -1038,7 +1051,7 @@ void crate_drop_mission()
 			}
 		}
 
-		if (eventMade && crateMade && !ENTITY::DOES_ENTITY_EXIST(crate))
+		if (mission_is_prepared && crateMade && !ENTITY::DOES_ENTITY_EXIST(crate))
 		{
 			money_math();
 			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard1);
@@ -1052,13 +1065,13 @@ void crate_drop_mission()
 			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard9);
 			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard10);
 			specialCrate = false;
-			eventMade = false;
+			mission_is_prepared = false;
 			eventOver = false;
 			crateMade = false;
 			missionTime = 0;
 		}
 
-		if (eventOver && spawnDistance > 1000 || eventMade && ENTITY::IS_ENTITY_DEAD(playerPed))
+		if (eventOver && spawnDistance > 1000 || mission_is_prepared && ENTITY::IS_ENTITY_DEAD(playerPed))
 		{
 			if (specialCrate)
 				NotifyAboveMap("The ~y~special crate~w~ has been claimed by smugglers.");
@@ -1079,7 +1092,7 @@ void crate_drop_mission()
 			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard9);
 			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard10);
 			specialCrate = false;
-			eventMade = false;
+			mission_is_prepared = false;
 			eventOver = false;
 			crateMade = false;
 			missionTime = 0;
@@ -1090,7 +1103,7 @@ void crate_drop_mission()
 Ped target;
 Blip targetBlip;
 
-void assassination_spawn()
+void PrepareAssassinationMission()
 {
 	Vector3 spawn;
 	float heading;
@@ -1189,7 +1202,7 @@ void assassination_spawn()
 		UI::SET_BLIP_SPRITE(targetBlip, 1);
 	UI::SET_BLIP_COLOUR(targetBlip, 1);
 	UI::SET_BLIP_DISPLAY(targetBlip, (char)"you will never see this");
-	eventMade = true;
+	mission_is_prepared = true;
 	type_of_event = 4;
 	NotifyAboveMap("A hit has been placed on a ~r~target~w~.  Kill them for a reward.");
 	if (beep == 1)
@@ -1198,13 +1211,13 @@ void assassination_spawn()
 
 void assassination_mission()
 {
-	if (eventMade && type_of_event == 4)
+	if (mission_is_prepared && type_of_event == 4)
 	{
 		Vector3 position = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
 		Vector3 targetPos = ENTITY::GET_ENTITY_COORDS(target, 0);
 		int targetDistance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(targetPos.x, targetPos.y, targetPos.z, position.x, position.y, position.z, 0);
 
-		if (ENTITY::IS_ENTITY_DEAD(target) && eventMade)
+		if (ENTITY::IS_ENTITY_DEAD(target) && mission_is_prepared)
 		{
 			money_math();
 			UI::REMOVE_BLIP(&targetBlip);
@@ -1212,19 +1225,19 @@ void assassination_mission()
 			NotifyAboveMap("Target killed.\nReward: ~g~$1500~w~");
 			if (beep == 1)
 				PlayNotificationBeep();
-			eventMade = false;
+			mission_is_prepared = false;
 			eventOver = false;
 			missionTime = 0;
 		}
 
-		if (eventOver && targetDistance > 1000 || eventMade && ENTITY::IS_ENTITY_DEAD(playerPed))
+		if (eventOver && targetDistance > 1000 || mission_is_prepared && ENTITY::IS_ENTITY_DEAD(playerPed))
 		{
 			NotifyAboveMap("The hit on the ~r~target~w~ has expired.");
 			if (beep == 1)
 				PlayNotificationBeep();
 			UI::REMOVE_BLIP(&targetBlip);
 			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&target);
-			eventMade = false;
+			mission_is_prepared = false;
 			eventOver = false;
 			missionTime = 0;
 		}
@@ -1234,7 +1247,7 @@ void assassination_mission()
 Vehicle truck;
 Blip truckBlip;
 
-void armored_truck_spawn()
+void PrepareArmoredTruckMission()
 {
 	Vector3 spawn;
 	float heading;
@@ -1333,7 +1346,7 @@ void armored_truck_spawn()
 		UI::SET_BLIP_SPRITE(truckBlip, 1);
 	UI::SET_BLIP_COLOUR(truckBlip, 3);
 	UI::SET_BLIP_DISPLAY(truckBlip, (char)"you will never see this");
-	eventMade = true;
+	mission_is_prepared = true;
 	type_of_event = 5;
 	NotifyAboveMap("An ~b~armored truck~w~ has been spotted carrying cash.");
 	if (beep == 1)
@@ -1347,7 +1360,7 @@ bool driverMade = false;
 
 void armored_truck_mission()
 {
-	if (eventMade && type_of_event == 5)
+	if (mission_is_prepared && type_of_event == 5)
 	{
 		Vector3 position = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
 		truckPos = ENTITY::GET_ENTITY_COORDS(truck, 0);
@@ -1365,7 +1378,7 @@ void armored_truck_mission()
 			}
 		}
 
-		if (VEHICLE::IS_VEHICLE_DOOR_FULLY_OPEN(truck, 2) && eventMade || VEHICLE::IS_VEHICLE_DOOR_FULLY_OPEN(truck, 3) && eventMade)
+		if (VEHICLE::IS_VEHICLE_DOOR_FULLY_OPEN(truck, 2) && mission_is_prepared || VEHICLE::IS_VEHICLE_DOOR_FULLY_OPEN(truck, 3) && mission_is_prepared)
 		{
 			int random = rand() % 3 + 1;
 
@@ -1399,13 +1412,13 @@ void armored_truck_mission()
 			UI::REMOVE_BLIP(&truckBlip);
 			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&driver);
 			ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&truck);
-			eventMade = false;
+			mission_is_prepared = false;
 			eventOver = false;
 			driverMade = false;
 			missionTime = 0;
 		}
 
-		if (eventOver && truckDistance > 1000 || eventMade && ENTITY::IS_ENTITY_DEAD(playerPed))
+		if (eventOver && truckDistance > 1000 || mission_is_prepared && ENTITY::IS_ENTITY_DEAD(playerPed))
 		{
 			NotifyAboveMap("The ~b~armored truck~w~ has finished carrying cash.");
 			if (beep == 1)
@@ -1416,13 +1429,13 @@ void armored_truck_mission()
 			UI::REMOVE_BLIP(&truckBlip);
 			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&driver);
 			ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&truck);
-			eventMade = false;
+			mission_is_prepared = false;
 			eventOver = false;
 			driverMade = false;
 			missionTime = 0;
 		}
 
-		if (!VEHICLE::IS_VEHICLE_DRIVEABLE(truck, 1) && eventMade)
+		if (!VEHICLE::IS_VEHICLE_DRIVEABLE(truck, 1) && mission_is_prepared)
 		{
 			NotifyAboveMap("The ~b~armored truck~w~ has been destroyed.  The cash cases inside have been ruined.");
 			if (beep == 1)
@@ -1430,7 +1443,7 @@ void armored_truck_mission()
 			UI::REMOVE_BLIP(&truckBlip);
 			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&driver);
 			ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&truck);
-			eventMade = false;
+			mission_is_prepared = false;
 			eventOver = false;
 			driverMade = false;
 			missionTime = 0;
@@ -1443,67 +1456,45 @@ void update()
 	playerPed = PLAYER::PLAYER_PED_ID();
 	player = PLAYER::PLAYER_ID(); // need to be updated every cycle?
 
-	if (timer_is_started == false)
-	{
-		timer_start_minute = TIME::GET_CLOCK_MINUTES();
-		timer_is_started = true;
-	}
-
-	//int minute = TIME::GET_CLOCK_MINUTES();
-
-	if (int(TIME::GET_CLOCK_MINUTES()) != timer_start_minute)
-	{
-		if (!eventMade)
-		{
-			if (makeEvent)
-			{
-				enum Mission {CollectVehicle, Assassination, DestroyVehicle, ArmoredTruck, CrateDrop};
-				Mission mission = Mission(rand() % 5); // no method for getting length of enum == poor show.
-				switch (mission)
-				{
-					case CollectVehicle	: PrepareCollectibleVehicleMission(); break;
-					case Assassination	: assassination_spawn()				; break;
-					case DestroyVehicle	: arms_smuggler_spawn()				; break;
-					case ArmoredTruck	: armored_truck_spawn()				; break;
-					case CrateDrop		: crate_drop_spawn()				; break;
-				}
-				makeEvent = false;
+	if (int(TIME::GET_CLOCK_MINUTES()) != timer_start_minute) {
+		if (!mission_is_prepared) {
+			if (ready_to_prepare_mission) {
+				ready_to_prepare_mission = false;
 				waitTime = 0;
-			}
-			else
-			{
+				enum Mission {CollectVehicle, DestroyVehicle, Assassination, ArmoredTruck, CrateDrop};
+				Mission mission = Mission(rand() % 5); // no method for getting length of enum == poor show.
+				switch (mission) {
+					case CollectVehicle	: PrepareCollectibleVehicleMission(); break;
+					case DestroyVehicle	: PrepareDestroyVehicleMission()	; break;
+					case Assassination	: PrepareAssassinationMission()		; break;
+					case ArmoredTruck	: PrepareArmoredTruckMission()		; break;
+					case CrateDrop		: PrepareCrateDropMission()			; break;
+				}
+			} else {
 				waitTime += 1;
 				if (waitTime == mission_start_delay_in_world_minutes)
-					makeEvent = true;
+					ready_to_prepare_mission = true;
 			}
 		}
 
-		if (eventMade)
+		if (mission_is_prepared)
 		{
 			missionTime += 1;
 			if (missionTime == mission_end_delay_in_world_minutes)
 				eventOver = true;
 		}
-		timer_is_started = false;
+		// timer_is_started = false;
 	}
+	WAIT(DWORD(TIME::GET_MILLISECONDS_PER_GAME_MINUTE)); // this should wait one game minute, right?
 }
 
 void main()
 {
 
 	GetSettingsFromIniFile();
-
-	while (true)
-	{
-		WAIT(0);
-		if (!DLC2::GET_IS_LOADING_SCREEN_ACTIVE()) // hopefully this actually does what it says...
-			if (PLAYER::IS_PLAYER_PLAYING(player)) break; // wait for player to get a ped - which should already be true if the above is.
-	}
-
-	NotifyBottomCenter("Pausing for persistence scripts."); // this never gets displayed, which means the player is "in control" before the screen fades in.
-	WAIT(seconds_to_wait_for_vehicle_persistence_scripts*1000);
-	NotifyBottomCenter("Getting reserved spawn points...");
-	PreGatherReservedSpawnPoints();
+	InitialWaitForGame(seconds_to_wait_for_vehicle_persistence_scripts);
+	if (seconds_to_wait_for_vehicle_persistence_scripts > 0) // no point in wasting spawns if the user doesn't use a persistence script.
+		GetParkedCarsInRange(reserved_vehicle_spawn_points_parked);
 
 	while (true)
 	{
