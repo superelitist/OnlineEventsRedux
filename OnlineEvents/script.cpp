@@ -34,11 +34,12 @@ bool eventOver = false;
 bool specialCrate = false;
 Ped playerPed; // breaks naming convention because 
 Player player;
+int game_clock_minutes;
 std::vector<Vector4> reserved_vehicle_spawn_points_parked;
 std::vector<Vector4> vehicle_spawn_points;
 std::vector<Hash> possible_vehicle_models;
 
-int play_notification_beeps, mission_end_delay_in_world_minutes, mission_start_delay_in_world_minutes, blipStyle;
+int play_notification_beeps, mission_timeout, mission_cooldown, blipStyle;
 int seconds_to_wait_for_vehicle_persistence_scripts;
 int maximum_number_of_spawn_points, maximum_number_of_vehicle_models, vehicle_search_range_minimum;
 int vehicle_spawn_point_minimum_range, vehicle_spawn_point_maximum_range;
@@ -49,8 +50,8 @@ bool notify_number_of_possible_vehicle_models, notify_number_of_possible_spawn_p
 
 void GetSettingsFromIniFile() {
 	play_notification_beeps = reader.ReadInteger("Options", "BeepEnabled", 1);
-	mission_end_delay_in_world_minutes = reader.ReadInteger("Options", "mission_end_delay_in_world_minutes", 210) / 2;
-	mission_start_delay_in_world_minutes = std::max((reader.ReadInteger("Options", "mission_start_delay_in_world_minutes", 150) / 2), 20);
+	mission_timeout = reader.ReadInteger("Options", "mission_end_delay_in_world_minutes", 210) / 2;
+	mission_cooldown = std::max((reader.ReadInteger("Options", "mission_start_delay_in_world_minutes", 150) / 2), 20);
 	blipStyle = reader.ReadInteger("Options", "BlipStyle", 0);
 	seconds_to_wait_for_vehicle_persistence_scripts = reader.ReadInteger("Options", "seconds_to_wait_for_vehicle_persistence_scripts", 20);
 	maximum_number_of_spawn_points = reader.ReadInteger("Options", "maximum_number_of_spawn_points", 10000);
@@ -66,20 +67,19 @@ void GetSettingsFromIniFile() {
 	notify_number_of_reserved_spawn_points = reader.ReadInteger("Debug", "notify_number_of_reserved_spawn_points", false);
 }
 
-void InitialWaitForGame(int additional_seconds_to_wait) {
+void InitialWaitForGame(uint seconds) {
 	while (true) {
-		if (!DLC2::GET_IS_LOADING_SCREEN_ACTIVE()) {// hopefully this actually does what it says...
-			Logger.Write("!DLC2::GET_IS_LOADING_SCREEN_ACTIVE()");
-			if (PLAYER::IS_PLAYER_PLAYING(player)) {
-				Logger.Write("PLAYER::IS_PLAYER_PLAYING(player)");
-				break; // wait for player to get a ped - which should already be true if the above is.
-			}
-		}
+		if (!DLC2::GET_IS_LOADING_SCREEN_ACTIVE()) if (PLAYER::IS_PLAYER_PLAYING(player)) break; // this appears to work...
 		WAIT(0);
 	}
-	Logger.Write("additional wait time...");
-	WAIT(additional_seconds_to_wait * 1000);
-	Logger.Write("done waiting");
+	WAIT(seconds * 1000);
+	return;
+}
+
+void UglyHackForVehiclePersistenceScripts(uint seconds) {
+	if (!(seconds > 0)) return; // no point in wasting time or spawns if the user doesn't use a persistence script.
+	WAIT(seconds * 1000); // let the persistence script start up and spawn its own vehicles.
+	GetParkedCarsFromWorld(playerPed, reserved_vehicle_spawn_points_parked, maximum_number_of_spawn_points, vehicle_search_range_minimum); // set aside these spawns. Note that some legitimate spawns will invariably get reserved. This is why it's an ugly hack.
 	return;
 }
 
@@ -92,8 +92,7 @@ Hash GetHashOfVehicleModel(Vehicle vehicle) {
 }
 
 bool IsVehicleDrivable(Vehicle vehicle) {
-	Hash hash_of_vehicle_model
-		= GetHashOfVehicleModel(vehicle);
+	Hash hash_of_vehicle_model = GetHashOfVehicleModel(vehicle);
 	if (VEHICLE::IS_VEHICLE_DRIVEABLE(vehicle, false) &&
 		(VEHICLE::IS_THIS_MODEL_A_CAR(hash_of_vehicle_model) ||
 			VEHICLE::IS_THIS_MODEL_A_BIKE(hash_of_vehicle_model) ||
@@ -119,10 +118,11 @@ bool IsVehicleProbablyNotCurrentlyBeingUsed(Vehicle vehicle) {
 	return false;
 }
 
-void NotifyAboveMap(char* message) {
+void CreateNotification(char* message, int is_beep_enabled) {
 	UI::_SET_NOTIFICATION_TEXT_ENTRY("STRING");
 	UI::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME(message);
 	UI::_DRAW_NOTIFICATION(0, 1);
+	if (is_beep_enabled == 1) AUDIO::PLAY_SOUND_FRONTEND(-1, "Text_Arrive_Tone", "Phone_SoundSet_Default", 0);
 }
 
 void NotifyBottomCenter(char* message) {
@@ -147,6 +147,7 @@ void money_math() {
 	sprintf_s(statNameFull, "SP%d_TOTAL_CASH", model);
 	Hash hash = GAMEPLAY::GET_HASH_KEY(statNameFull);
 	STATS::STAT_GET_INT(hash, &val, -1);
+	char * notification_message;
 
 	if (type_of_event == 1) val += 20000;
 	if (type_of_event == 2) val += 10000;
@@ -157,56 +158,57 @@ void money_math() {
 			if (random == 1) {
 				val += 50000;
 				WEAPON::GIVE_DELAYED_WEAPON_TO_PED(playerPed, GAMEPLAY::GET_HASH_KEY("WEAPON_RPG"), 1000, 1);
-				NotifyAboveMap("Crate collected.\nContents:\n- ~g~$10000~w~\n- RPG");
+				notification_message = "Crate collected.\nContents:\n- ~g~$10000~w~\n- RPG";
 			}
 			if (random == 2) {
 				val += 75000;
 				WEAPON::GIVE_DELAYED_WEAPON_TO_PED(playerPed, GAMEPLAY::GET_HASH_KEY("WEAPON_MINIGUN"), 1000, 1);
-				NotifyAboveMap("Crate collected.\nContents:\n- ~g~$15000~w~\n- Minigun");
+				notification_message = "Crate collected.\nContents:\n- ~g~$15000~w~\n- Minigun";
 			}
 			if (random == 3) {
 				val += 25000;
 				WEAPON::GIVE_DELAYED_WEAPON_TO_PED(playerPed, GAMEPLAY::GET_HASH_KEY("WEAPON_GRENADELAUNCHER"), 1000, 1);
-				NotifyAboveMap("Crate collected.\nContents:\n- ~g~$10000~w~\n- Grenade Launcher");
+				notification_message = "Crate collected.\nContents:\n- ~g~$10000~w~\n- Grenade Launcher";
 			}
 			if (random == 4) {
 				val += 15000;
 				WEAPON::GIVE_DELAYED_WEAPON_TO_PED(playerPed, GAMEPLAY::GET_HASH_KEY("WEAPON_STICKYBOMB"), 1000, 1);
-				NotifyAboveMap("Crate collected.\nContents:\n- ~g~$15000~w~\n- Sticky Bombs");
+				notification_message = "Crate collected.\nContents:\n- ~g~$15000~w~\n- Sticky Bombs";
 			}
 			if (random == 5) {
 				val += 20000;
 				WEAPON::GIVE_DELAYED_WEAPON_TO_PED(playerPed, GAMEPLAY::GET_HASH_KEY("WEAPON_MOLOTOV"), 1000, 1);
-				NotifyAboveMap("Crate collected.\nContents:\n- ~g~$20000~w~\n- Molotovs");
+				notification_message = "Crate collected.\nContents:\n- ~g~$20000~w~\n- Molotovs";
 			}
 		} else {
 			if (random == 1) {
 				val += 10000;
 				WEAPON::GIVE_DELAYED_WEAPON_TO_PED(playerPed, GAMEPLAY::GET_HASH_KEY("WEAPON_HEAVYSNIPER"), 1000, 1);
-				NotifyAboveMap("Crate collected.\nContents:\n- ~g~$1000~w~\n- Heavy Sniper");
+				notification_message = "Crate collected.\nContents:\n- ~g~$1000~w~\n- Heavy Sniper";
 			}
 			if (random == 2) {
 				val += 15000;
 				WEAPON::GIVE_DELAYED_WEAPON_TO_PED(playerPed, GAMEPLAY::GET_HASH_KEY("WEAPON_ASSAULTRIFLE"), 1000, 1);
-				NotifyAboveMap("Crate collected.\nContents:\n- ~g~$1500~w~\n- Assault Rifle");
+				notification_message = "Crate collected.\nContents:\n- ~g~$1500~w~\n- Assault Rifle";
 			}
 			if (random == 3) {
 				val += 20000;
 				WEAPON::GIVE_DELAYED_WEAPON_TO_PED(playerPed, GAMEPLAY::GET_HASH_KEY("WEAPON_COMBATMG"), 1000, 1);
-				NotifyAboveMap("Crate collected.\nContents:\n- ~g~$2000~w~\n- Combat MG");
+				notification_message = "Crate collected.\nContents:\n- ~g~$2000~w~\n- Combat MG";
 			}
 			if (random == 4) {
 				val += 25000;
 				WEAPON::GIVE_DELAYED_WEAPON_TO_PED(playerPed, GAMEPLAY::GET_HASH_KEY("WEAPON_PUMPSHOTGUN"), 1000, 1);
-				NotifyAboveMap("Crate collected.\nContents:\n- ~g~$2500~w~\n- Pump Shotgun");
+				notification_message = "Crate collected.\nContents:\n- ~g~$2500~w~\n- Pump Shotgun";
 			}
 			if (random == 5) {
 				val += 30000;
 				WEAPON::GIVE_DELAYED_WEAPON_TO_PED(playerPed, GAMEPLAY::GET_HASH_KEY("WEAPON_APPISTOL"), 1000, 1);
-				NotifyAboveMap("Crate collected.\nContents:\n- ~g~$3000~w~\n- AP Pistol");
+				notification_message = "Crate collected.\nContents:\n- ~g~$3000~w~\n- AP Pistol";
 			}
 		}
-		PlayNotificationBeep();
+		CreateNotification(notification_message, play_notification_beeps);
+		//PlayNotificationBeep();
 	}
 	if (type_of_event == 4)
 		val += 15000;
@@ -240,8 +242,10 @@ std::vector<Vector4> GetParkedCarsFromWorld(Ped ped, std::vector<Vector4> vector
 					(VEHICLE::_IS_VEHICLE_SHOP_RESPRAY_ALLOWED(this_vehicle)) && // hopefully this actually works so airport luggage trains don't get tagged...
 					GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, this_vehicle_coordinates.x, this_vehicle_coordinates.y, this_vehicle_coordinates.z, 0) > search_range_minimum
 					) {
-						
-						
+						// CHECK WHETHER THERE IS A BLIP AT THIS POSITION
+						// CHECK WHETHER THERE IS A BLIP AT THIS POSITION
+						// CHECK WHETHER THERE IS A BLIP AT THIS POSITION
+						// CHECK WHETHER THERE IS A BLIP AT THIS POSITION
 						auto predicate = [this_vehicle_position](const Vector4 & item) { // didn't want to define a lambda inline, it gets ugly fast.
 							return (item.x == this_vehicle_position.x && item.y == this_vehicle_position.y && item.z == this_vehicle_position.z && item.h == this_vehicle_position.h);
 						};
@@ -353,7 +357,7 @@ std::vector<Hash> GetVehicleModelsFromWorld(Ped ped, std::vector<Hash> vector_of
 Vehicle collectible_vehicle;
 Blip vehicle_blip;
 
-void PrepareCollectibleVehicleMission()
+void PrepareStealVehicleMission()
 {
 	//NotifyAboveMap(&("Reserved Spawn Points: " + std::to_string(reserved_vehicle_spawn_points_parked.size()))[0u]);
 	Logger.Write("PrepareCollectibleVehicleMission()");
@@ -368,17 +372,18 @@ void PrepareCollectibleVehicleMission()
 		if (distance_between_player_and_spawn_point > vehicle_spawn_point_minimum_range &&
 			distance_between_player_and_spawn_point < vehicle_spawn_point_maximum_range)
 		{
-			if (notify_distance_to_spawn_point) NotifyAboveMap(&("Distance to Spawn: " + std::to_string(distance_between_player_and_spawn_point))[0u]); // combined into one line I hope it works...
+			if (notify_distance_to_spawn_point) CreateNotification(&("Distance to Spawn: " + std::to_string(distance_between_player_and_spawn_point))[0u], play_notification_beeps); // combined into one line I hope it works...
 			break;
 		}
-		tries += 1;
-		if (tries > 1000) break;
+		//tries += 1;
+		if (tries++ > 1000)
+		{
+			CreateNotification("failed to find a spawn point, one thousand times!", play_notification_beeps);
+			return;
+		}
 		WAIT(0);
 	}
-	if (tries > 1000) {
-		NotifyAboveMap("failed to find a spawn point, one thousand times!");
-		return;
-	}
+
 	Hash vehicle_model_to_use = possible_vehicle_models[(rand() % possible_vehicle_models.size())]; // pick a random model from our set, pray that it's still loaded in memory?
 	STREAMING::REQUEST_MODEL(vehicle_model_to_use);
 	while (!STREAMING::HAS_MODEL_LOADED(vehicle_model_to_use))
@@ -399,8 +404,7 @@ void PrepareCollectibleVehicleMission()
 	UI::SET_BLIP_DISPLAY(vehicle_blip, (char)"you will never see this");
 	mission_is_prepared = true;
 	type_of_event = 1;
-	NotifyAboveMap("A ~y~special vehicle~w~ has been requested for pickup.");
-	PlayNotificationBeep();
+	CreateNotification("A ~y~special vehicle~w~ has been requested for pickup.", play_notification_beeps);
 }
 
 bool wantedSet = false;
@@ -416,7 +420,7 @@ int primary2, secondary2;
 int wanted;
 Blip dropOff;
 
-void vehicle_collection_mission()
+void ExecuteStealVehicleMission()
 {
 	if (mission_is_prepared && type_of_event == 1)
 	{
@@ -434,9 +438,7 @@ void vehicle_collection_mission()
 				PLAYER::SET_PLAYER_WANTED_LEVEL_NOW(player, 1);
 			}
 			wantedSet = true;
-			NotifyAboveMap("Respray the vehicle before turning it in.");
-			if (play_notification_beeps == 1)
-				PlayNotificationBeep();
+			CreateNotification("Respray the vehicle before turning it in.", play_notification_beeps);
 		}
 
 		if (!gotColor)
@@ -453,9 +455,7 @@ void vehicle_collection_mission()
 		if (primary1 != primary2 && ENTITY::GET_ENTITY_SPEED(collectible_vehicle) != 0 && !resprayed ||
 			secondary1 != secondary2  && ENTITY::GET_ENTITY_SPEED(collectible_vehicle) != 0 && !resprayed)
 		{
-			NotifyAboveMap("The vehicle is ready to be turned in to the ~y~garage~w~ at the docks.");
-			if (play_notification_beeps == 1)
-				PlayNotificationBeep();
+			CreateNotification("The vehicle is ready to be turned in to the ~y~garage~w~ at the docks.", play_notification_beeps);
 			dropOff = UI::ADD_BLIP_FOR_COORD(1226.06f, -3231.36f, 6.02f);
 			if (blipStyle == 0)
 				UI::SET_BLIP_SPRITE(dropOff, 50);
@@ -478,9 +478,7 @@ void vehicle_collection_mission()
 				WAIT(0);
 			AI::TASK_LEAVE_VEHICLE(playerPed, collectible_vehicle, 0);
 			VEHICLE::SET_VEHICLE_UNDRIVEABLE(collectible_vehicle, 1);
-			NotifyAboveMap("Vehicle collected.\nReward: ~g~$2000~w~");
-			if (play_notification_beeps == 1)
-				PlayNotificationBeep();
+			CreateNotification("Vehicle collected.\nReward: ~g~$2000~w~", play_notification_beeps);
 			money_math();
 			UI::REMOVE_BLIP(&dropOff);
 			UI::REMOVE_BLIP(&vehicle_blip);
@@ -496,9 +494,7 @@ void vehicle_collection_mission()
 
 		if (!VEHICLE::IS_VEHICLE_DRIVEABLE(collectible_vehicle, 1) && mission_is_prepared)
 		{
-			NotifyAboveMap("The ~y~special vehicle~w~ has been destroyed.");
-			if (play_notification_beeps == 1)
-				PlayNotificationBeep();
+			CreateNotification("The ~y~special vehicle~w~ has been destroyed.", play_notification_beeps);
 
 			if (resprayed)
 				UI::REMOVE_BLIP(&dropOff);
@@ -516,9 +512,7 @@ void vehicle_collection_mission()
 
 		if (eventOver && vehicleDistance > collection_mission_minimum_range_for_timeout || mission_is_prepared && ENTITY::IS_ENTITY_DEAD(playerPed))
 		{
-			NotifyAboveMap("The ~y~special vehicle~w~ is no longer requested.");
-			if (play_notification_beeps == 1)
-				PlayNotificationBeep();
+			CreateNotification("The ~y~special vehicle~w~ is no longer requested.", play_notification_beeps);
 
 			if (resprayed)
 				UI::REMOVE_BLIP(&dropOff);
@@ -658,12 +652,10 @@ void PrepareDestroyVehicleMission()
 	UI::SET_BLIP_DISPLAY(smugglerBlip, (char)"you will never see this");
 	mission_is_prepared = true;
 	type_of_event = 2;
-	NotifyAboveMap("A ~r~smuggler vehicle~w~ has been spotted.  Destroy it for a reward.");
-	if (play_notification_beeps == 1)
-		PlayNotificationBeep();
+	CreateNotification("A ~r~smuggler vehicle~w~ has been spotted.  Destroy it for a reward.", play_notification_beeps);
 }
 
-void arms_smuggler_mission()
+void ExecuteDestroyVehicleMission()
 {
 	if (mission_is_prepared && type_of_event == 2)
 	{
@@ -676,9 +668,7 @@ void arms_smuggler_mission()
 			money_math();
 			UI::REMOVE_BLIP(&smugglerBlip);
 			ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&smugglerVehicle);
-			NotifyAboveMap("Vehicle destroyed.\nReward: ~g~$1000~w~");
-			if (play_notification_beeps == 1)
-				PlayNotificationBeep();
+			CreateNotification("Vehicle destroyed.\nReward: ~g~$1000~w~", play_notification_beeps);
 			mission_is_prepared = false;
 			eventOver = false;
 			missionTime = 0;
@@ -686,9 +676,7 @@ void arms_smuggler_mission()
 
 		if (eventOver && vehicleDistance > 1000 || mission_is_prepared && ENTITY::IS_ENTITY_DEAD(playerPed))
 		{
-			NotifyAboveMap("The ~r~smuggler vehicle~w~ has been claimed by smugglers.");
-			if (play_notification_beeps == 1)
-				PlayNotificationBeep();
+			CreateNotification("The ~r~smuggler vehicle~w~ has been claimed by smugglers.", play_notification_beeps);
 			UI::REMOVE_BLIP(&smugglerBlip);
 			ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&smugglerVehicle);
 			mission_is_prepared = false;
@@ -791,11 +779,9 @@ void PrepareCrateDropMission()
 		UI::SET_BLIP_COLOUR(crateBlip, 2);
 	UI::SET_BLIP_DISPLAY(crateBlip, (char)"you will never see this");
 	if (specialCrate)
-		NotifyAboveMap("A ~y~special crate~w~ has been dropped.");
+		CreateNotification("A ~y~special crate~w~ has been dropped.", play_notification_beeps);
 	if (!specialCrate)
-		NotifyAboveMap("A ~g~crate~w~ has been dropped.");
-	if (play_notification_beeps == 1)
-		PlayNotificationBeep();
+		CreateNotification("A ~g~crate~w~ has been dropped.", play_notification_beeps);
 	mission_is_prepared = true;
 	type_of_event = 3;
 }
@@ -805,7 +791,7 @@ bool spawnguards = false;
 Object crate;
 Ped guard1, guard2, guard3, guard4, guard5, guard6, guard7, guard8, guard9, guard10;
 
-void crate_drop_mission()
+void ExecuteCrateDropMission()
 {
 	if (mission_is_prepared && type_of_event == 3)
 	{
@@ -989,9 +975,9 @@ void crate_drop_mission()
 		if (eventOver && spawnDistance > 1000 || mission_is_prepared && ENTITY::IS_ENTITY_DEAD(playerPed))
 		{
 			if (specialCrate)
-				NotifyAboveMap("The ~y~special crate~w~ has been claimed by smugglers.");
+				CreateNotification("The ~y~special crate~w~ has been claimed by smugglers.", play_notification_beeps);
 			if (!specialCrate)
-				NotifyAboveMap("The ~g~crate~w~ has been claimed by smugglers.");
+				CreateNotification("The ~g~crate~w~ has been claimed by smugglers.", play_notification_beeps);
 			if (play_notification_beeps == 1)
 				PlayNotificationBeep();
 			UI::REMOVE_BLIP(&crateBlip);
@@ -1119,12 +1105,10 @@ void PrepareAssassinationMission()
 	UI::SET_BLIP_DISPLAY(targetBlip, (char)"you will never see this");
 	mission_is_prepared = true;
 	type_of_event = 4;
-	NotifyAboveMap("A hit has been placed on a ~r~target~w~.  Kill them for a reward.");
-	if (play_notification_beeps == 1)
-		PlayNotificationBeep();
+	CreateNotification("A hit has been placed on a ~r~target~w~.  Kill them for a reward.", play_notification_beeps);
 }
 
-void assassination_mission()
+void ExecuteAssassinationMission()
 {
 	if (mission_is_prepared && type_of_event == 4)
 	{
@@ -1137,9 +1121,7 @@ void assassination_mission()
 			money_math();
 			UI::REMOVE_BLIP(&targetBlip);
 			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&target);
-			NotifyAboveMap("Target killed.\nReward: ~g~$1500~w~");
-			if (play_notification_beeps == 1)
-				PlayNotificationBeep();
+			CreateNotification("Target killed.\nReward: ~g~$1500~w~", play_notification_beeps);
 			mission_is_prepared = false;
 			eventOver = false;
 			missionTime = 0;
@@ -1147,9 +1129,7 @@ void assassination_mission()
 
 		if (eventOver && targetDistance > 1000 || mission_is_prepared && ENTITY::IS_ENTITY_DEAD(playerPed))
 		{
-			NotifyAboveMap("The hit on the ~r~target~w~ has expired.");
-			if (play_notification_beeps == 1)
-				PlayNotificationBeep();
+			CreateNotification("The hit on the ~r~target~w~ has expired.", play_notification_beeps);
 			UI::REMOVE_BLIP(&targetBlip);
 			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&target);
 			mission_is_prepared = false;
@@ -1263,9 +1243,7 @@ void PrepareArmoredTruckMission()
 	UI::SET_BLIP_DISPLAY(truckBlip, (char)"you will never see this");
 	mission_is_prepared = true;
 	type_of_event = 5;
-	NotifyAboveMap("An ~b~armored truck~w~ has been spotted carrying cash.");
-	if (play_notification_beeps == 1)
-		PlayNotificationBeep();
+	CreateNotification("An ~b~armored truck~w~ has been spotted carrying cash.", play_notification_beeps);
 }
 
 Object case1, case2, case3;
@@ -1273,7 +1251,7 @@ Vector3 truckPos;
 Ped driver;
 bool driverMade = false;
 
-void armored_truck_mission()
+void ExecuteArmoredTruckMission()
 {
 	if (mission_is_prepared && type_of_event == 5)
 	{
@@ -1315,9 +1293,7 @@ void armored_truck_mission()
 			ENTITY::SET_OBJECT_AS_NO_LONGER_NEEDED(&case1);
 			ENTITY::SET_OBJECT_AS_NO_LONGER_NEEDED(&case1);
 
-			NotifyAboveMap("The ~b~armored truck's~w~ doors have opened.  Cash has been dropped.");
-			if (play_notification_beeps == 1)
-				PlayNotificationBeep();
+			CreateNotification("The ~b~armored truck's~w~ doors have opened.  Cash has been dropped.", play_notification_beeps);
 			wanted = PLAYER::GET_PLAYER_WANTED_LEVEL(player);
 			if (wanted < 3)
 			{
@@ -1335,9 +1311,7 @@ void armored_truck_mission()
 
 		if (eventOver && truckDistance > 1000 || mission_is_prepared && ENTITY::IS_ENTITY_DEAD(playerPed))
 		{
-			NotifyAboveMap("The ~b~armored truck~w~ has finished carrying cash.");
-			if (play_notification_beeps == 1)
-				PlayNotificationBeep();
+			CreateNotification("The ~b~armored truck~w~ has finished carrying cash.", play_notification_beeps);
 			ENTITY::SET_OBJECT_AS_NO_LONGER_NEEDED(&case1);
 			ENTITY::SET_OBJECT_AS_NO_LONGER_NEEDED(&case1);
 			ENTITY::SET_OBJECT_AS_NO_LONGER_NEEDED(&case1);
@@ -1352,9 +1326,7 @@ void armored_truck_mission()
 
 		if (!VEHICLE::IS_VEHICLE_DRIVEABLE(truck, 1) && mission_is_prepared)
 		{
-			NotifyAboveMap("The ~b~armored truck~w~ has been destroyed.  The cash cases inside have been ruined.");
-			if (play_notification_beeps == 1)
-				PlayNotificationBeep();
+			CreateNotification("The ~b~armored truck~w~ has been destroyed.  The cash cases inside have been ruined.", play_notification_beeps);
 			UI::REMOVE_BLIP(&truckBlip);
 			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&driver);
 			ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&truck);
@@ -1366,24 +1338,24 @@ void armored_truck_mission()
 	}
 }
 
-void update()
-{
-	Logger.Write("update()");
+void Update() {
 	playerPed = PLAYER::PLAYER_PED_ID();
 	player = PLAYER::PLAYER_ID(); // need to be updated every cycle?
+	game_clock_minutes = int(TIME::GET_CLOCK_MINUTES());
+	GetParkedCarsFromWorld(playerPed, vehicle_spawn_points, maximum_number_of_spawn_points, vehicle_search_range_minimum);
+	GetVehicleModelsFromWorld(playerPed, possible_vehicle_models, maximum_number_of_vehicle_models, vehicle_search_range_minimum);
+}
 
-	if (int(TIME::GET_CLOCK_MINUTES()) != timer_start_minute) {
-		Logger.Write("int(TIME::GET_CLOCK_MINUTES()) != timer_start_minute");
-		if (!mission_is_prepared) {
-			Logger.Write("!mission_is_prepared");
-			if (ready_to_prepare_mission) {
-				Logger.Write("ready_to_prepare_mission");
-				ready_to_prepare_mission = false;
-				waitTime = 0;
-				enum Mission {CollectVehicle, DestroyVehicle, Assassination, ArmoredTruck, CrateDrop};
+void CreateAMission();
+
+void MissionHandler(bool mission_is_running, ) {
+		if (!mission_is_running) {
+			if (time_since_last_mission > mission_cooldown) {
+				CreateAMission();
+				enum Mission {StealVehicle, DestroyVehicle, Assassination, ArmoredTruck, CrateDrop};
 				Mission mission = Mission(rand() % 5); // no method for getting length of enum == poor show.
 				switch (mission) {
-					case CollectVehicle	: PrepareCollectibleVehicleMission(); break;
+					case StealVehicle	: PrepareStealVehicleMission()		; break;
 					case DestroyVehicle	: PrepareDestroyVehicleMission()	; break;
 					case Assassination	: PrepareAssassinationMission()		; break;
 					case ArmoredTruck	: PrepareArmoredTruckMission()		; break;
@@ -1392,55 +1364,41 @@ void update()
 			} else {
 				Logger.Write("NOT ready_to_prepare_mission");
 				waitTime += 1;
-				if (waitTime == mission_start_delay_in_world_minutes)
+				if (waitTime == mission_cooldown)
 					ready_to_prepare_mission = true;
 			}
 		}
 
-		if (mission_is_prepared)
-		{
+		if (mission_is_prepared) {
 			missionTime += 1;
-			if (missionTime == mission_end_delay_in_world_minutes)
+			if (missionTime == mission_timeout)
 				eventOver = true;
 		}
 		// timer_is_started = false;
-	}
+	//}
 	Logger.Write("WAIT(DWORD(TIME::GET_MILLISECONDS_PER_GAME_MINUTE))");
 	Logger.Write("Milliseconds: " + std::to_string(DWORD(TIME::GET_MILLISECONDS_PER_GAME_MINUTE))[0u]);
 	WAIT(DWORD(TIME::GET_MILLISECONDS_PER_GAME_MINUTE)); // this should wait one game minute, right?
 	Logger.Write("Done waiting...");
 }
 
-void main()
-{
+void main() {
 	Logger.Write("main()");
 	
 	GetSettingsFromIniFile();
-	Logger.Write("entering InitialWaitForGame");
-	InitialWaitForGame(seconds_to_wait_for_vehicle_persistence_scripts);
-	Logger.Write("waiting is over, populating reserved_vehicle_spawn_points_parked");
-	if (seconds_to_wait_for_vehicle_persistence_scripts > 0) // no point in wasting spawns if the user doesn't use a persistence script.
-		GetParkedCarsFromWorld(playerPed, reserved_vehicle_spawn_points_parked, maximum_number_of_spawn_points, vehicle_search_range_minimum);
-	Logger.Write("done...");
-	while (true)
-	{
-		GetParkedCarsFromWorld(playerPed, vehicle_spawn_points, maximum_number_of_spawn_points, vehicle_search_range_minimum);
-		GetVehicleModelsFromWorld(playerPed, possible_vehicle_models, maximum_number_of_vehicle_models, vehicle_search_range_minimum);
-		vehicle_collection_mission();
-		arms_smuggler_mission();
-		crate_drop_mission();
-		assassination_mission();
-		armored_truck_mission();
-		update();
+	InitialWaitForGame(1); // ehh... I don't even know if any additional wait time is necessary...
+	UglyHackForVehiclePersistenceScripts(seconds_to_wait_for_vehicle_persistence_scripts); // UGLY HACK FOR VEHICLE PERSISTENCE!
+
+	while (true) {
+		Update();
+		MissionHandler();
 		WAIT(0);
 	}
 
 	Logger.Close(); // I don't think this will ever happen...
 }
 
-void ScriptMain()
-{
-	Logger.Write("ScriptMain()");
+void ScriptMain() {
 	srand(GetTickCount());
 	main();
 }
