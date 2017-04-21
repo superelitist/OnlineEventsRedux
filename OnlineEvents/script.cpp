@@ -31,11 +31,12 @@ typedef struct
 
 #pragma warning(disable : 4244 4305) // double <-> float conversions
 
-int minute, base_minute, type_of_event;
+// int minute,
+int timer_start_minute, type_of_event;
 int missionTime = 0;
 int waitTime = 0;
 bool makeEvent = false;
-bool gotMin = false;
+bool timer_is_started = false;
 bool eventMade = false;
 bool eventOver = false;
 bool specialCrate = false;
@@ -47,7 +48,9 @@ int seconds_to_wait_for_vehicle_persistence_scripts;
 int spawn_points_vector_maximum_size, vehicle_models_max_size, vehicle_search_range_minimum;
 int vehicle_spawn_point_minimum_range, vehicle_spawn_point_maximum_range;
 int collection_mission_minimum_range_for_timeout;
+bool notify_get_parked_cars_in_range;
 bool notify_number_of_possible_vehicle_models, notify_number_of_possible_spawn_points, notify_distance_to_spawn_point, notify_number_of_reserved_spawn_points;
+
 
 void GetSettingsFromIniFile() {
 	beep = reader.ReadInteger("Options", "BeepEnabled", 1);
@@ -61,10 +64,12 @@ void GetSettingsFromIniFile() {
 	vehicle_spawn_point_minimum_range = reader.ReadInteger("Options", "vehicle_spawn_point_minimum_range", 666);
 	vehicle_spawn_point_maximum_range = reader.ReadInteger("Options", "vehicle_spawn_point_maximum_range", 1332);
 	collection_mission_minimum_range_for_timeout = reader.ReadInteger("Options", "collection_mission_minimum_range_for_timeout", 666);
+	notify_get_parked_cars_in_range = reader.ReadInteger("Debug", "notify_get_parked_cars_in_range", false);
 	notify_number_of_possible_vehicle_models = reader.ReadInteger("Debug", "notify_number_of_possible_vehicle_models", false);
 	notify_number_of_possible_spawn_points = reader.ReadInteger("Debug", "notify_number_of_possible_spawn_points", false);
 	notify_distance_to_spawn_point = reader.ReadInteger("Debug", "notify_distance_to_spawn_point", false);
-	notify_number_of_reserved_spawn_points = reader.ReadInteger("Debug", "notify_number_of_reserved_spawn_points", true);
+	notify_number_of_reserved_spawn_points = reader.ReadInteger("Debug", "notify_number_of_reserved_spawn_points", false);
+	
 	
 }
 
@@ -244,6 +249,53 @@ void money_math()
 		val += 15000;
 
 	STATS::STAT_SET_INT(hash, val, 1);
+}
+
+std::vector<Vector4> GetParkedCarsInRange(std::vector<Vector4> vector_of_vector4s) {
+	const int ARR_SIZE = 1024;
+	Vehicle all_world_vehicles[ARR_SIZE];
+	int count = worldGetAllVehicles(all_world_vehicles, ARR_SIZE);
+	Vector3 player_coordinates = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
+
+	if (all_world_vehicles != NULL)
+	{
+		for (int i = 0; i < count; i++)
+		{
+			if (DoesEntityExistAndIsNotNull(all_world_vehicles[i]))
+			{
+				Vehicle this_vehicle = all_world_vehicles[i];
+				Vector3 this_vehicle_coordinates = ENTITY::GET_ENTITY_COORDS(this_vehicle, 0);
+				Vector4 this_vehicle_position;
+				this_vehicle_position.x_ = this_vehicle_coordinates.x;
+				this_vehicle_position.y_ = this_vehicle_coordinates.y;
+				this_vehicle_position.z_ = this_vehicle_coordinates.z;
+				this_vehicle_position.h_ = ENTITY::GET_ENTITY_HEADING(this_vehicle);
+
+				if (DoesEntityExistAndIsNotNull(this_vehicle) &&
+					IsVehicleDrivable(this_vehicle) && // is the vehicle a car/bike/etc and can the player start driving it?
+					IsVehicleProbablyNotCurrentlyBeingUsed(this_vehicle) && // not moving, no driver?
+					!(VEHICLE::GET_LAST_PED_IN_VEHICLE_SEAT(this_vehicle, -1)) && // probably not previously used by the player? We can hope?
+					!(VEHICLE::_IS_VEHICLE_DAMAGED(this_vehicle)) && // probably not an empty car in the street as a result of a pileup...
+					(VEHICLE::_IS_VEHICLE_SHOP_RESPRAY_ALLOWED(this_vehicle)) && // hopefully this actually works so airport luggage trains don't get tagged...
+					GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, this_vehicle_coordinates.x, this_vehicle_coordinates.y, this_vehicle_coordinates.z, 0) > vehicle_search_range_minimum
+					)
+				{
+					{
+						// make sure thisVehPosition does not already exist in possCollectMsnSpawnPts
+						// didn't want to define a lambda inline, it gets ugly fast.
+						auto predicate = [this_vehicle_position](const Vector4 & item) {
+							return (item.x_ == this_vehicle_position.x_ && item.y_ == this_vehicle_position.y_ && item.z_ == this_vehicle_position.z_ && item.h_ == this_vehicle_position.h_);
+						};
+						bool found = (std::find_if(vector_of_vector4s.begin(), vector_of_vector4s.end(), predicate) != vector_of_vector4s.end());
+						if (!found) vector_of_vector4s.push_back(this_vehicle_position);
+						//if (possible_vehicle_spawn_points_parked.size() > spawn_points_vector_maximum_size) possible_vehicle_spawn_points_parked.erase(possible_vehicle_spawn_points_parked.begin()); // just in case it gets filled up, first in first out
+						//if (notify_number_of_reserved_spawn_points) NotifyAboveMap(&("Unusable Spawn Points: " + std::to_string(reserved_vehicle_spawn_points_parked.size()))[0u]); // lol so much work to get some ints and chars output on screen
+						if (notify_get_parked_cars_in_range) NotifyBottomCenter(&("GetParkedCarsInRange(): " + std::to_string(vector_of_vector4s.size()))[0u]); // lol so much work to get some ints and chars output on screen
+					}
+				}
+			}
+		}
+	}
 }
 
 std::vector<Vector4> reserved_vehicle_spawn_points_parked;
@@ -1389,43 +1441,31 @@ void armored_truck_mission()
 void update()
 {
 	playerPed = PLAYER::PLAYER_PED_ID();
-	player = PLAYER::PLAYER_ID();
+	player = PLAYER::PLAYER_ID(); // need to be updated every cycle?
 
-	if (gotMin == false)
+	if (timer_is_started == false)
 	{
-		base_minute = TIME::GET_CLOCK_MINUTES();
-		gotMin = true;
+		timer_start_minute = TIME::GET_CLOCK_MINUTES();
+		timer_is_started = true;
 	}
 
-	minute = TIME::GET_CLOCK_MINUTES();
+	//int minute = TIME::GET_CLOCK_MINUTES();
 
-	if (minute != base_minute)
+	if (int(TIME::GET_CLOCK_MINUTES()) != timer_start_minute)
 	{
 		if (!eventMade)
 		{
 			if (makeEvent)
 			{
-				int random = rand() % 1;
-
-				if (random == 0)
+				enum Mission {CollectVehicle, Assassination, DestroyVehicle, ArmoredTruck, CrateDrop};
+				Mission mission = Mission(rand() % 5); // no method for getting length of enum == poor show.
+				switch (mission)
 				{
-					PrepareCollectibleVehicleMission();
-				}
-				if (random == 1)
-				{
-					arms_smuggler_spawn();
-				}
-				if (random == 2)
-				{
-					crate_drop_spawn();
-				}
-				if (random == 3)
-				{
-					assassination_spawn();
-				}
-				if (random == 4)
-				{
-					armored_truck_spawn();
+					case CollectVehicle	: PrepareCollectibleVehicleMission(); break;
+					case Assassination	: assassination_spawn()				; break;
+					case DestroyVehicle	: arms_smuggler_spawn()				; break;
+					case ArmoredTruck	: armored_truck_spawn()				; break;
+					case CrateDrop		: crate_drop_spawn()				; break;
 				}
 				makeEvent = false;
 				waitTime = 0;
@@ -1444,7 +1484,7 @@ void update()
 			if (missionTime == mission_end_delay_in_world_minutes)
 				eventOver = true;
 		}
-		gotMin = false;
+		timer_is_started = false;
 	}
 }
 
@@ -1456,7 +1496,8 @@ void main()
 	while (true)
 	{
 		WAIT(0);
-		if (PLAYER::IS_PLAYER_PLAYING(player)) break; // wait for player to get a ped...
+		if (!DLC2::GET_IS_LOADING_SCREEN_ACTIVE()) // hopefully this actually does what it says...
+			if (PLAYER::IS_PLAYER_PLAYING(player)) break; // wait for player to get a ped - which should already be true if the above is.
 	}
 
 	NotifyBottomCenter("Pausing for persistence scripts."); // this never gets displayed, which means the player is "in control" before the screen fades in.
