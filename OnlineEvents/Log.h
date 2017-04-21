@@ -3,6 +3,7 @@
 
 #include <string>
 #include <fstream>
+#include <Windows.h>
 
 class Log
 {
@@ -13,5 +14,7 @@ public:
 private:
 	std::string line_to_log;
 	std::ofstream file_object;
+	ULONGLONG log_time_start;
+	ULONG log_time_delta;
 };
 #endif // LOG_H

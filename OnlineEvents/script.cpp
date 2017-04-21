@@ -17,23 +17,13 @@
 //#include "keyboard.h"
 
 CIniReader reader(".\\OnlineEvents.ini");
+Log Logger(".\\OnlineEvents.log");
 
-typedef struct
-{
-	float x_;
-	DWORD _paddingx;
-	float y_;
-	DWORD _paddingy;
-	float z_;
-	DWORD _paddingz;
-	float h_;
-	DWORD _paddingw;
-} Vector4;
+typedef struct { float x; DWORD _paddingx; float y; DWORD _paddingy; float z; DWORD _paddingz; float h; DWORD _paddingw; } Vector4;
 
 #pragma warning(disable : 4244 4305) // double <-> float conversions
 #pragma warning(disable : 4302)
 
-// int minute,
 int timer_start_minute, type_of_event;
 int missionTime = 0;
 int waitTime = 0;
@@ -42,15 +32,15 @@ bool timer_is_started = false;
 bool mission_is_prepared = false;
 bool eventOver = false;
 bool specialCrate = false;
-Ped playerPed;
+Ped playerPed; // breaks naming convention because 
 Player player;
 std::vector<Vector4> reserved_vehicle_spawn_points_parked;
-std::vector<Vector4> possible_vehicle_spawn_points_parked;
+std::vector<Vector4> vehicle_spawn_points;
 std::vector<Hash> possible_vehicle_models;
 
-int beep, mission_end_delay_in_world_minutes, mission_start_delay_in_world_minutes, blipStyle;
+int play_notification_beeps, mission_end_delay_in_world_minutes, mission_start_delay_in_world_minutes, blipStyle;
 int seconds_to_wait_for_vehicle_persistence_scripts;
-int spawn_points_vector_maximum_size, vehicle_models_max_size, vehicle_search_range_minimum;
+int maximum_number_of_spawn_points, maximum_number_of_vehicle_models, vehicle_search_range_minimum;
 int vehicle_spawn_point_minimum_range, vehicle_spawn_point_maximum_range;
 int collection_mission_minimum_range_for_timeout;
 bool notify_get_parked_cars_in_range;
@@ -58,13 +48,13 @@ bool notify_number_of_possible_vehicle_models, notify_number_of_possible_spawn_p
 
 
 void GetSettingsFromIniFile() {
-	beep = reader.ReadInteger("Options", "BeepEnabled", 1);
+	play_notification_beeps = reader.ReadInteger("Options", "BeepEnabled", 1);
 	mission_end_delay_in_world_minutes = reader.ReadInteger("Options", "mission_end_delay_in_world_minutes", 210) / 2;
 	mission_start_delay_in_world_minutes = std::max((reader.ReadInteger("Options", "mission_start_delay_in_world_minutes", 150) / 2), 20);
 	blipStyle = reader.ReadInteger("Options", "BlipStyle", 0);
 	seconds_to_wait_for_vehicle_persistence_scripts = reader.ReadInteger("Options", "seconds_to_wait_for_vehicle_persistence_scripts", 20);
-	spawn_points_vector_maximum_size = reader.ReadInteger("Options", "spawn_points_vector_maximum_size", 10000);
-	vehicle_models_max_size = reader.ReadInteger("Options", "vehicle_models_max_size", 1000);
+	maximum_number_of_spawn_points = reader.ReadInteger("Options", "maximum_number_of_spawn_points", 10000);
+	maximum_number_of_vehicle_models = reader.ReadInteger("Options", "maximum_number_of_vehicle_models", 1000);
 	vehicle_search_range_minimum = reader.ReadInteger("Options", "vehicle_search_range_minimum", 50);
 	vehicle_spawn_point_minimum_range = reader.ReadInteger("Options", "vehicle_spawn_point_minimum_range", 666);
 	vehicle_spawn_point_maximum_range = reader.ReadInteger("Options", "vehicle_spawn_point_maximum_range", 1332);
@@ -74,19 +64,22 @@ void GetSettingsFromIniFile() {
 	notify_number_of_possible_spawn_points = reader.ReadInteger("Debug", "notify_number_of_possible_spawn_points", false);
 	notify_distance_to_spawn_point = reader.ReadInteger("Debug", "notify_distance_to_spawn_point", false);
 	notify_number_of_reserved_spawn_points = reader.ReadInteger("Debug", "notify_number_of_reserved_spawn_points", false);
-	
-	
 }
 
-void InitialWaitForGame(int additional_seconds_to_wait)
-{
-	while (true)
-	{
-		if (!DLC2::GET_IS_LOADING_SCREEN_ACTIVE()) // hopefully this actually does what it says...
-			if (PLAYER::IS_PLAYER_PLAYING(player)) break; // wait for player to get a ped - which should already be true if the above is.
+void InitialWaitForGame(int additional_seconds_to_wait) {
+	while (true) {
+		if (!DLC2::GET_IS_LOADING_SCREEN_ACTIVE()) {// hopefully this actually does what it says...
+			Logger.Write("!DLC2::GET_IS_LOADING_SCREEN_ACTIVE()");
+			if (PLAYER::IS_PLAYER_PLAYING(player)) {
+				Logger.Write("PLAYER::IS_PLAYER_PLAYING(player)");
+				break; // wait for player to get a ped - which should already be true if the above is.
+			}
+		}
 		WAIT(0);
 	}
+	Logger.Write("additional wait time...");
 	WAIT(additional_seconds_to_wait * 1000);
+	Logger.Write("done waiting");
 	return;
 }
 
@@ -111,8 +104,7 @@ bool IsVehicleDrivable(Vehicle vehicle) {
 			//VEHICLE::IS_THIS_MODEL_A_PLANE(hash_of_vehicle_model) ||
 			//VEHICLE::IS_THIS_MODEL_A_BOAT(hash_of_vehicle_model) ||
 			//VEHICLE::IS_THIS_MODEL_A_BICYCLE(hash_of_vehicle_model
-			))
-	{
+			)) {
 		return true;
 	}
 	return false;
@@ -121,8 +113,7 @@ bool IsVehicleDrivable(Vehicle vehicle) {
 bool IsVehicleProbablyNotCurrentlyBeingUsed(Vehicle vehicle) {
 	if ((VEHICLE::IS_VEHICLE_STOPPED(vehicle)) &&
 		(VEHICLE::GET_PED_IN_VEHICLE_SEAT(vehicle, -1) == 0) && // IS_VEHICLE_SEAT_FREE doesn't fucking work.
-		(VEHICLE::GET_VEHICLE_NUMBER_OF_PASSENGERS(vehicle) == 0))
-	{
+		(VEHICLE::GET_VEHICLE_NUMBER_OF_PASSENGERS(vehicle) == 0)) {
 		return true;
 	}
 	return false;
@@ -141,126 +132,81 @@ void NotifyBottomCenter(char* message) {
 }
 
 void PlayNotificationBeep() {
-	AUDIO::PLAY_SOUND_FRONTEND(-1, "Text_Arrive_Tone", "Phone_SoundSet_Default", 0);
+	if (play_notification_beeps == 1) AUDIO::PLAY_SOUND_FRONTEND(-1, "Text_Arrive_Tone", "Phone_SoundSet_Default", 0);
 }
 
 int model;
 int val;
 
-void money_math()
-{
-	if (PED::IS_PED_MODEL(playerPed, GAMEPLAY::GET_HASH_KEY("player_zero")))
-	{
-		model = 0;
-	}
-	if (PED::IS_PED_MODEL(playerPed, GAMEPLAY::GET_HASH_KEY("player_one")))
-	{
-		model = 1;
-	}
-	if (PED::IS_PED_MODEL(playerPed, GAMEPLAY::GET_HASH_KEY("player_two")))
-	{
-		model = 2;
-	}
+void money_math() {
+	if (PED::IS_PED_MODEL(playerPed, GAMEPLAY::GET_HASH_KEY("player_zero"))) model = 0;
+	if (PED::IS_PED_MODEL(playerPed, GAMEPLAY::GET_HASH_KEY("player_one")))  model = 1;
+	if (PED::IS_PED_MODEL(playerPed, GAMEPLAY::GET_HASH_KEY("player_two")))  model = 2;
 
 	char statNameFull[32];
 	sprintf_s(statNameFull, "SP%d_TOTAL_CASH", model);
 	Hash hash = GAMEPLAY::GET_HASH_KEY(statNameFull);
 	STATS::STAT_GET_INT(hash, &val, -1);
 
-	if (type_of_event == 1)
-		val += 20000;
-	if (type_of_event == 2)
-		val += 10000;
-	if (type_of_event == 3)
-	{
+	if (type_of_event == 1) val += 20000;
+	if (type_of_event == 2) val += 10000;
+	if (type_of_event == 3)	{
 		int random = rand() % 5 + 1;
 
-		if (specialCrate)
-		{
-			if (random == 1)
-			{
+		if (specialCrate) {
+			if (random == 1) {
 				val += 50000;
 				WEAPON::GIVE_DELAYED_WEAPON_TO_PED(playerPed, GAMEPLAY::GET_HASH_KEY("WEAPON_RPG"), 1000, 1);
 				NotifyAboveMap("Crate collected.\nContents:\n- ~g~$10000~w~\n- RPG");
-				if (beep == 1)
-					PlayNotificationBeep();
 			}
-			if (random == 2)
-			{
+			if (random == 2) {
 				val += 75000;
 				WEAPON::GIVE_DELAYED_WEAPON_TO_PED(playerPed, GAMEPLAY::GET_HASH_KEY("WEAPON_MINIGUN"), 1000, 1);
 				NotifyAboveMap("Crate collected.\nContents:\n- ~g~$15000~w~\n- Minigun");
-				if (beep == 1)
-					PlayNotificationBeep();
 			}
-			if (random == 3)
-			{
+			if (random == 3) {
 				val += 25000;
 				WEAPON::GIVE_DELAYED_WEAPON_TO_PED(playerPed, GAMEPLAY::GET_HASH_KEY("WEAPON_GRENADELAUNCHER"), 1000, 1);
 				NotifyAboveMap("Crate collected.\nContents:\n- ~g~$10000~w~\n- Grenade Launcher");
-				if (beep == 1)
-					PlayNotificationBeep();
 			}
-			if (random == 4)
-			{
+			if (random == 4) {
 				val += 15000;
 				WEAPON::GIVE_DELAYED_WEAPON_TO_PED(playerPed, GAMEPLAY::GET_HASH_KEY("WEAPON_STICKYBOMB"), 1000, 1);
 				NotifyAboveMap("Crate collected.\nContents:\n- ~g~$15000~w~\n- Sticky Bombs");
-				if (beep == 1)
-					PlayNotificationBeep();
 			}
-			if (random == 5)
-			{
+			if (random == 5) {
 				val += 20000;
 				WEAPON::GIVE_DELAYED_WEAPON_TO_PED(playerPed, GAMEPLAY::GET_HASH_KEY("WEAPON_MOLOTOV"), 1000, 1);
 				NotifyAboveMap("Crate collected.\nContents:\n- ~g~$20000~w~\n- Molotovs");
-				if (beep == 1)
-					PlayNotificationBeep();
 			}
-		}
-		else
-		{
-			if (random == 1)
-			{
+		} else {
+			if (random == 1) {
 				val += 10000;
 				WEAPON::GIVE_DELAYED_WEAPON_TO_PED(playerPed, GAMEPLAY::GET_HASH_KEY("WEAPON_HEAVYSNIPER"), 1000, 1);
 				NotifyAboveMap("Crate collected.\nContents:\n- ~g~$1000~w~\n- Heavy Sniper");
-				if (beep == 1)
-					PlayNotificationBeep();
 			}
-			if (random == 2)
-			{
+			if (random == 2) {
 				val += 15000;
 				WEAPON::GIVE_DELAYED_WEAPON_TO_PED(playerPed, GAMEPLAY::GET_HASH_KEY("WEAPON_ASSAULTRIFLE"), 1000, 1);
 				NotifyAboveMap("Crate collected.\nContents:\n- ~g~$1500~w~\n- Assault Rifle");
-				if (beep == 1)
-					PlayNotificationBeep();
 			}
-			if (random == 3)
-			{
+			if (random == 3) {
 				val += 20000;
 				WEAPON::GIVE_DELAYED_WEAPON_TO_PED(playerPed, GAMEPLAY::GET_HASH_KEY("WEAPON_COMBATMG"), 1000, 1);
 				NotifyAboveMap("Crate collected.\nContents:\n- ~g~$2000~w~\n- Combat MG");
-				if (beep == 1)
-					PlayNotificationBeep();
 			}
-			if (random == 4)
-			{
+			if (random == 4) {
 				val += 25000;
 				WEAPON::GIVE_DELAYED_WEAPON_TO_PED(playerPed, GAMEPLAY::GET_HASH_KEY("WEAPON_PUMPSHOTGUN"), 1000, 1);
 				NotifyAboveMap("Crate collected.\nContents:\n- ~g~$2500~w~\n- Pump Shotgun");
-				if (beep == 1)
-					PlayNotificationBeep();
 			}
-			if (random == 5)
-			{
+			if (random == 5) {
 				val += 30000;
 				WEAPON::GIVE_DELAYED_WEAPON_TO_PED(playerPed, GAMEPLAY::GET_HASH_KEY("WEAPON_APPISTOL"), 1000, 1);
 				NotifyAboveMap("Crate collected.\nContents:\n- ~g~$3000~w~\n- AP Pistol");
-				if (beep == 1)
-					PlayNotificationBeep();
 			}
 		}
+		PlayNotificationBeep();
 	}
 	if (type_of_event == 4)
 		val += 15000;
@@ -268,25 +214,23 @@ void money_math()
 	STATS::STAT_SET_INT(hash, val, 1);
 }
 
-std::vector<Vector4> GetParkedCarsInRange(std::vector<Vector4> vector_of_vector4s) {
+std::vector<Vector4> GetParkedCarsFromWorld(Ped ped, std::vector<Vector4> vector_of_vector4s, int maximum_vector_size, int search_range_minimum) {
+	Logger.Write("GetParkedCarsInRange()");
 	const int ARR_SIZE = 1024;
 	Vehicle all_world_vehicles[ARR_SIZE];
 	int count = worldGetAllVehicles(all_world_vehicles, ARR_SIZE);
-	Vector3 player_coordinates = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
+	Vector3 player_coordinates = ENTITY::GET_ENTITY_COORDS(ped, 0);
 
-	if (all_world_vehicles != NULL)
-	{
-		for (int i = 0; i < count; i++)
-		{
-			if (DoesEntityExistAndIsNotNull(all_world_vehicles[i]))
-			{
+	if (all_world_vehicles != NULL) {
+		for (int i = 0; i < count; i++) {
+			if (DoesEntityExistAndIsNotNull(all_world_vehicles[i])) {
 				Vehicle this_vehicle = all_world_vehicles[i];
 				Vector3 this_vehicle_coordinates = ENTITY::GET_ENTITY_COORDS(this_vehicle, 0);
 				Vector4 this_vehicle_position;
-				this_vehicle_position.x_ = this_vehicle_coordinates.x;
-				this_vehicle_position.y_ = this_vehicle_coordinates.y;
-				this_vehicle_position.z_ = this_vehicle_coordinates.z;
-				this_vehicle_position.h_ = ENTITY::GET_ENTITY_HEADING(this_vehicle);
+				this_vehicle_position.x = this_vehicle_coordinates.x;
+				this_vehicle_position.y = this_vehicle_coordinates.y;
+				this_vehicle_position.z = this_vehicle_coordinates.z;
+				this_vehicle_position.h = ENTITY::GET_ENTITY_HEADING(this_vehicle);
 
 				if (DoesEntityExistAndIsNotNull(this_vehicle) &&
 					IsVehicleDrivable(this_vehicle) && // is the vehicle a car/bike/etc and can the player start driving it?
@@ -294,21 +238,17 @@ std::vector<Vector4> GetParkedCarsInRange(std::vector<Vector4> vector_of_vector4
 					!(VEHICLE::GET_LAST_PED_IN_VEHICLE_SEAT(this_vehicle, -1)) && // probably not previously used by the player? We can hope?
 					!(VEHICLE::_IS_VEHICLE_DAMAGED(this_vehicle)) && // probably not an empty car in the street as a result of a pileup...
 					(VEHICLE::_IS_VEHICLE_SHOP_RESPRAY_ALLOWED(this_vehicle)) && // hopefully this actually works so airport luggage trains don't get tagged...
-					GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, this_vehicle_coordinates.x, this_vehicle_coordinates.y, this_vehicle_coordinates.z, 0) > vehicle_search_range_minimum
-					)
-				{
-					{
-						// make sure thisVehPosition does not already exist in possCollectMsnSpawnPts
-						// didn't want to define a lambda inline, it gets ugly fast.
-						auto predicate = [this_vehicle_position](const Vector4 & item) {
-							return (item.x_ == this_vehicle_position.x_ && item.y_ == this_vehicle_position.y_ && item.z_ == this_vehicle_position.z_ && item.h_ == this_vehicle_position.h_);
+					GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, this_vehicle_coordinates.x, this_vehicle_coordinates.y, this_vehicle_coordinates.z, 0) > search_range_minimum
+					) {
+						
+						
+						auto predicate = [this_vehicle_position](const Vector4 & item) { // didn't want to define a lambda inline, it gets ugly fast.
+							return (item.x == this_vehicle_position.x && item.y == this_vehicle_position.y && item.z == this_vehicle_position.z && item.h == this_vehicle_position.h);
 						};
-						bool found = (std::find_if(vector_of_vector4s.begin(), vector_of_vector4s.end(), predicate) != vector_of_vector4s.end());
+						bool found = (std::find_if(vector_of_vector4s.begin(), vector_of_vector4s.end(), predicate) != vector_of_vector4s.end()); // make sure this_vehicle_position does not already exist in vector_of_vector4s
 						if (!found) vector_of_vector4s.push_back(this_vehicle_position);
-						//if (possible_vehicle_spawn_points_parked.size() > spawn_points_vector_maximum_size) possible_vehicle_spawn_points_parked.erase(possible_vehicle_spawn_points_parked.begin()); // just in case it gets filled up, first in first out
-						//if (notify_number_of_reserved_spawn_points) NotifyAboveMap(&("Unusable Spawn Points: " + std::to_string(reserved_vehicle_spawn_points_parked.size()))[0u]); // lol so much work to get some ints and chars output on screen
-						if (notify_get_parked_cars_in_range) NotifyBottomCenter(&("GetParkedCarsInRange(): " + std::to_string(vector_of_vector4s.size()))[0u]); // lol so much work to get some ints and chars output on screen
-					}
+						if (vector_of_vector4s.size() > maximum_vector_size) vector_of_vector4s.erase(vector_of_vector4s.begin()); // just in case it gets filled up, first in first out
+						//if (notify_get_parked_cars_in_range) NotifyBottomCenter(&("GetParkedCarsInRange(): " + std::to_string(vector_of_vector4s.size()))[0u]); // lol so much work to get some ints and chars output on screen
 				}
 			}
 		}
@@ -316,138 +256,115 @@ std::vector<Vector4> GetParkedCarsInRange(std::vector<Vector4> vector_of_vector4
 	return vector_of_vector4s;
 }
 
-void PreGatherReservedSpawnPoints()
-{
-	// before we get into our main routine, we need to reserve spawn points for persistence mods.
+std::vector<Hash> GetVehicleModelsFromWorld(Ped ped, std::vector<Hash> vector_of_hashes, int maximum_vector_size, int search_range_minimum) {
 	const int ARR_SIZE = 1024;
 	Vehicle all_world_vehicles[ARR_SIZE];
 	int count = worldGetAllVehicles(all_world_vehicles, ARR_SIZE);
 	Vector3 player_coordinates = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
 
-	if (all_world_vehicles != NULL)
-	{
-		for (int i = 0; i < count; i++)
-		{
-			if (DoesEntityExistAndIsNotNull(all_world_vehicles[i]))
-			{
+	if (all_world_vehicles != NULL) {
+		for (int i = 0; i < count; i++) {
+			if (DoesEntityExistAndIsNotNull(all_world_vehicles[i])) {
 				Vehicle this_vehicle = all_world_vehicles[i];
 				Vector3 this_vehicle_coordinates = ENTITY::GET_ENTITY_COORDS(this_vehicle, 0);
-				Vector4 this_vehicle_position;
-				this_vehicle_position.x_ = this_vehicle_coordinates.x;
-				this_vehicle_position.y_ = this_vehicle_coordinates.y;
-				this_vehicle_position.z_ = this_vehicle_coordinates.z;
-				this_vehicle_position.h_ = ENTITY::GET_ENTITY_HEADING(this_vehicle);
-
 				if (DoesEntityExistAndIsNotNull(this_vehicle) &&
 					IsVehicleDrivable(this_vehicle) && // is the vehicle a car/bike/etc and can the player start driving it?
 					IsVehicleProbablyNotCurrentlyBeingUsed(this_vehicle) && // not moving, no driver?
 					!(VEHICLE::GET_LAST_PED_IN_VEHICLE_SEAT(this_vehicle, -1)) && // probably not previously used by the player? We can hope?
 					!(VEHICLE::_IS_VEHICLE_DAMAGED(this_vehicle)) && // probably not an empty car in the street as a result of a pileup...
 					(VEHICLE::_IS_VEHICLE_SHOP_RESPRAY_ALLOWED(this_vehicle)) && // hopefully this actually works so airport luggage trains don't get tagged...
-					GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, this_vehicle_coordinates.x, this_vehicle_coordinates.y, this_vehicle_coordinates.z, 0) > vehicle_search_range_minimum
-					)
-				{
-					{
-						// make sure thisVehPosition does not already exist in possCollectMsnSpawnPts
-						// didn't want to define a lambda inline, it gets ugly fast.
-						auto predicate = [this_vehicle_position](const Vector4 & item) {
-							return (item.x_ == this_vehicle_position.x_ && item.y_ == this_vehicle_position.y_ && item.z_ == this_vehicle_position.z_ && item.h_ == this_vehicle_position.h_);
-						};
-						bool found = (std::find_if(reserved_vehicle_spawn_points_parked.begin(), reserved_vehicle_spawn_points_parked.end(), predicate) != reserved_vehicle_spawn_points_parked.end());
-						if (!found) reserved_vehicle_spawn_points_parked.push_back(this_vehicle_position);
-						//if (possible_vehicle_spawn_points_parked.size() > spawn_points_vector_maximum_size) possible_vehicle_spawn_points_parked.erase(possible_vehicle_spawn_points_parked.begin()); // just in case it gets filled up, first in first out
-						//if (notify_number_of_reserved_spawn_points) NotifyAboveMap(&("Unusable Spawn Points: " + std::to_string(reserved_vehicle_spawn_points_parked.size()))[0u]); // lol so much work to get some ints and chars output on screen
-						if (notify_number_of_reserved_spawn_points) NotifyBottomCenter(&("Unusable Spawn Points: " + std::to_string(reserved_vehicle_spawn_points_parked.size()))[0u]); // lol so much work to get some ints and chars output on screen
-					}
-				}
-			}
-		}
-	}
-}
-
-//void InitializeSpawnPoints() {
-//	possible_vehicle_spawn_points_parked.push_back(Vector4{ 254.46f, 84.91f, 99.57f, 250.01f });
-//}
-
-void GatherParkedVehicleSpawnPointsAndModels()
-{
-	// looks for an unused vehicle, saves the position and models to vectors.
-	//NotifyAboveMap("Starting collectCollectionMissionSpawnPoints()...");
-	const int ARR_SIZE = 1024;
-	Vehicle all_world_vehicles[ARR_SIZE];
-	int count = worldGetAllVehicles(all_world_vehicles, ARR_SIZE);
-	Vector3 player_coordinates = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
-		
-	if (all_world_vehicles != NULL)
-	{
-		for (int i = 0; i < count; i++)
-		{
-			if (DoesEntityExistAndIsNotNull(all_world_vehicles[i]))
-			{
-				Vehicle this_vehicle = all_world_vehicles[i];
-				Vector3 this_vehicle_coordinates = ENTITY::GET_ENTITY_COORDS(this_vehicle, 0);
-				Vector4 this_vehicle_position;
-				this_vehicle_position.x_ = this_vehicle_coordinates.x;
-				this_vehicle_position.y_ = this_vehicle_coordinates.y;
-				this_vehicle_position.z_ = this_vehicle_coordinates.z;
-				this_vehicle_position.h_ = ENTITY::GET_ENTITY_HEADING(this_vehicle);
-				
-				if (DoesEntityExistAndIsNotNull(this_vehicle) &&
-					IsVehicleDrivable(this_vehicle) && // is the vehicle a car/bike/etc and can the player start driving it?
-					IsVehicleProbablyNotCurrentlyBeingUsed(this_vehicle) && // not moving, no driver?
-					!(VEHICLE::GET_LAST_PED_IN_VEHICLE_SEAT(this_vehicle, -1)) && // probably not previously used by the player? We can hope?
-					!(VEHICLE::_IS_VEHICLE_DAMAGED(this_vehicle)) && // probably not an empty car in the street as a result of a pileup...
-					(VEHICLE::_IS_VEHICLE_SHOP_RESPRAY_ALLOWED(this_vehicle)) && // hopefully this actually works so airport luggage trains don't get tagged...
-					GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, this_vehicle_coordinates.x, this_vehicle_coordinates.y, this_vehicle_coordinates.z, 0) > vehicle_search_range_minimum
-					)
-				{
-					{
-						// didn't want to define a lambda inline, it gets ugly fast.
-						auto predicate = [this_vehicle_position](const Vector4 & item) {
-							return (item.x_ == this_vehicle_position.x_ && item.y_ == this_vehicle_position.y_ && item.z_ == this_vehicle_position.z_ && item.h_ == this_vehicle_position.h_);
-						};
-						bool reserved = (std::find_if(reserved_vehicle_spawn_points_parked.begin(), reserved_vehicle_spawn_points_parked.end(), predicate) != reserved_vehicle_spawn_points_parked.end()); // make sure it's not in our reserved list
-						if (!reserved) {
-							bool found = (std::find_if(possible_vehicle_spawn_points_parked.begin(), possible_vehicle_spawn_points_parked.end(), predicate) != possible_vehicle_spawn_points_parked.end());
-							if (!found) possible_vehicle_spawn_points_parked.push_back(this_vehicle_position);
-							if (possible_vehicle_spawn_points_parked.size() > spawn_points_vector_maximum_size) possible_vehicle_spawn_points_parked.erase(possible_vehicle_spawn_points_parked.begin()); // just in case it gets filled up, first in first out
-							if (notify_number_of_possible_spawn_points) NotifyAboveMap(&("Spawn Points: " + std::to_string(possible_vehicle_spawn_points_parked.size()))[0u]); // lol so much work to get some ints and chars output on screen
-						}
-
-						
-						
-					}
-					{
+					GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, this_vehicle_coordinates.x, this_vehicle_coordinates.y, this_vehicle_coordinates.z, 0) > search_range_minimum
+					) {
 						Hash this_vehicle_model = GetHashOfVehicleModel(this_vehicle);
-						auto predicate = [this_vehicle_model](const Hash & item) { // pretty sure this isn't necessary for hashes.
+						auto predicate = [this_vehicle_model](const Hash & item) { // pretty sure this isn't necessary for hashes, but it works.
 							return (item == this_vehicle_model);
 						};
-						bool found = (std::find_if(possible_vehicle_models.begin(), possible_vehicle_models.end(), predicate) != possible_vehicle_models.end());
-						if (!found) possible_vehicle_models.push_back(this_vehicle_model);
-						if (possible_vehicle_models.size() > vehicle_models_max_size) possible_vehicle_models.erase(possible_vehicle_models.begin()); // also pretty sure there's not more than a thousand models in the game, but safety first...
-						if (notify_number_of_possible_vehicle_models) NotifyAboveMap(&("Vehicle Models: " + std::to_string(possible_vehicle_models.size()))[0u]); // combined into one line I hope it works...
-					}
+						bool found = (std::find_if(vector_of_hashes.begin(), vector_of_hashes.end(), predicate) != vector_of_hashes.end());
+						if (!found) vector_of_hashes.push_back(this_vehicle_model);
+						if (vector_of_hashes.size() > maximum_vector_size) vector_of_hashes.erase(vector_of_hashes.begin()); // also pretty sure there's not more than a thousand models in the game, but safety first...
 				}
 			}
 		}
 	}
+	return vector_of_hashes;
 }
+
+//void GatherParkedVehicleSpawnPointsAndModels(vector_of_hashes) {
+//	const int ARR_SIZE = 1024;
+//	Vehicle all_world_vehicles[ARR_SIZE];
+//	int count = worldGetAllVehicles(all_world_vehicles, ARR_SIZE);
+//	Vector3 player_coordinates = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
+//		
+//	if (all_world_vehicles != NULL)
+//	{
+//		for (int i = 0; i < count; i++)
+//		{
+//			if (DoesEntityExistAndIsNotNull(all_world_vehicles[i]))
+//			{
+//				Vehicle this_vehicle = all_world_vehicles[i];
+//				Vector3 this_vehicle_coordinates = ENTITY::GET_ENTITY_COORDS(this_vehicle, 0);
+//				Vector4 this_vehicle_position;
+//				this_vehicle_position.x = this_vehicle_coordinates.x;
+//				this_vehicle_position.y = this_vehicle_coordinates.y;
+//				this_vehicle_position.z = this_vehicle_coordinates.z;
+//				this_vehicle_position.h = ENTITY::GET_ENTITY_HEADING(this_vehicle);
+//				
+//				if (DoesEntityExistAndIsNotNull(this_vehicle) &&
+//					IsVehicleDrivable(this_vehicle) && // is the vehicle a car/bike/etc and can the player start driving it?
+//					IsVehicleProbablyNotCurrentlyBeingUsed(this_vehicle) && // not moving, no driver?
+//					!(VEHICLE::GET_LAST_PED_IN_VEHICLE_SEAT(this_vehicle, -1)) && // probably not previously used by the player? We can hope?
+//					!(VEHICLE::_IS_VEHICLE_DAMAGED(this_vehicle)) && // probably not an empty car in the street as a result of a pileup...
+//					(VEHICLE::_IS_VEHICLE_SHOP_RESPRAY_ALLOWED(this_vehicle)) && // hopefully this actually works so airport luggage trains don't get tagged...
+//					GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, this_vehicle_coordinates.x, this_vehicle_coordinates.y, this_vehicle_coordinates.z, 0) > vehicle_search_range_minimum
+//					)
+//				{
+//					{
+//						// didn't want to define a lambda inline, it gets ugly fast.
+//						auto predicate = [this_vehicle_position](const Vector4 & item) {
+//							return (item.x == this_vehicle_position.x && item.y == this_vehicle_position.y && item.z == this_vehicle_position.z && item.h == this_vehicle_position.h);
+//						};
+//						bool reserved = (std::find_if(reserved_vehicle_spawn_points_parked.begin(), reserved_vehicle_spawn_points_parked.end(), predicate) != reserved_vehicle_spawn_points_parked.end()); // make sure it's not in our reserved list
+//						if (!reserved) {
+//							bool found = (std::find_if(possible_vehicle_spawn_points_parked.begin(), possible_vehicle_spawn_points_parked.end(), predicate) != possible_vehicle_spawn_points_parked.end());
+//							if (!found) possible_vehicle_spawn_points_parked.push_back(this_vehicle_position);
+//							if (possible_vehicle_spawn_points_parked.size() > maximum_number_of_spawn_points) possible_vehicle_spawn_points_parked.erase(possible_vehicle_spawn_points_parked.begin()); // just in case it gets filled up, first in first out
+//							if (notify_number_of_possible_spawn_points) NotifyAboveMap(&("Spawn Points: " + std::to_string(possible_vehicle_spawn_points_parked.size()))[0u]); // lol so much work to get some ints and chars output on screen
+//						}
+//
+//						
+//						
+//					}
+//					{
+//						Hash this_vehicle_model = GetHashOfVehicleModel(this_vehicle);
+//						auto predicate = [this_vehicle_model](const Hash & item) { // pretty sure this isn't necessary for hashes.
+//							return (item == this_vehicle_model);
+//						};
+//						bool found = (std::find_if(possible_vehicle_models.begin(), possible_vehicle_models.end(), predicate) != possible_vehicle_models.end());
+//						if (!found) possible_vehicle_models.push_back(this_vehicle_model);
+//						if (possible_vehicle_models.size() > maximum_number_of_vehicle_models) possible_vehicle_models.erase(possible_vehicle_models.begin()); // also pretty sure there's not more than a thousand models in the game, but safety first...
+//						if (notify_number_of_possible_vehicle_models) NotifyAboveMap(&("Vehicle Models: " + std::to_string(possible_vehicle_models.size()))[0u]); // combined into one line I hope it works...
+//					}
+//				}
+//			}
+//		}
+//	}
+//}
 
 Vehicle collectible_vehicle;
 Blip vehicle_blip;
 
 void PrepareCollectibleVehicleMission()
 {
-	//NotifyAboveMap("Starting PrepareCollectibleVehicleMission()...");
 	//NotifyAboveMap(&("Reserved Spawn Points: " + std::to_string(reserved_vehicle_spawn_points_parked.size()))[0u]);
-
+	Logger.Write("PrepareCollectibleVehicleMission()");
+	Logger.Write("Reserved Spawn Points: " + std::to_string(reserved_vehicle_spawn_points_parked.size())[0u]);
 	Vector3 player_coordinates = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
 	Vector4 vehicle_spawn_point_to_use;
 	int tries = 0;
 	while (true)
 	{
-		vehicle_spawn_point_to_use = possible_vehicle_spawn_points_parked[(rand() % possible_vehicle_spawn_points_parked.size())]; // pick a random possible point from our set
-		float distance_between_player_and_spawn_point = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, vehicle_spawn_point_to_use.x_, vehicle_spawn_point_to_use.y_, vehicle_spawn_point_to_use.z_, 0);
+		vehicle_spawn_point_to_use = vehicle_spawn_points[(rand() % vehicle_spawn_points.size())]; // pick a random possible point from our set
+		float distance_between_player_and_spawn_point = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, vehicle_spawn_point_to_use.x, vehicle_spawn_point_to_use.y, vehicle_spawn_point_to_use.z, 0);
 		if (distance_between_player_and_spawn_point > vehicle_spawn_point_minimum_range &&
 			distance_between_player_and_spawn_point < vehicle_spawn_point_maximum_range)
 		{
@@ -463,12 +380,10 @@ void PrepareCollectibleVehicleMission()
 		return;
 	}
 	Hash vehicle_model_to_use = possible_vehicle_models[(rand() % possible_vehicle_models.size())]; // pick a random model from our set, pray that it's still loaded in memory?
-	
-	// FINALLY create the vehicle
 	STREAMING::REQUEST_MODEL(vehicle_model_to_use);
 	while (!STREAMING::HAS_MODEL_LOADED(vehicle_model_to_use))
 		WAIT(0);
-	collectible_vehicle = VEHICLE::CREATE_VEHICLE(vehicle_model_to_use, vehicle_spawn_point_to_use.x_, vehicle_spawn_point_to_use.y_, vehicle_spawn_point_to_use.z_, vehicle_spawn_point_to_use.h_, 0, 0);
+	collectible_vehicle = VEHICLE::CREATE_VEHICLE(vehicle_model_to_use, vehicle_spawn_point_to_use.x, vehicle_spawn_point_to_use.y, vehicle_spawn_point_to_use.z, vehicle_spawn_point_to_use.h, 0, 0);
 	VEHICLE::SET_VEHICLE_ON_GROUND_PROPERLY(collectible_vehicle);
 	vehicle_blip = UI::ADD_BLIP_FOR_ENTITY(collectible_vehicle);
 	if (blipStyle == 0)
@@ -485,7 +400,7 @@ void PrepareCollectibleVehicleMission()
 	mission_is_prepared = true;
 	type_of_event = 1;
 	NotifyAboveMap("A ~y~special vehicle~w~ has been requested for pickup.");
-	if (beep == 1) PlayNotificationBeep();
+	PlayNotificationBeep();
 }
 
 bool wantedSet = false;
@@ -520,7 +435,7 @@ void vehicle_collection_mission()
 			}
 			wantedSet = true;
 			NotifyAboveMap("Respray the vehicle before turning it in.");
-			if (beep == 1)
+			if (play_notification_beeps == 1)
 				PlayNotificationBeep();
 		}
 
@@ -539,7 +454,7 @@ void vehicle_collection_mission()
 			secondary1 != secondary2  && ENTITY::GET_ENTITY_SPEED(collectible_vehicle) != 0 && !resprayed)
 		{
 			NotifyAboveMap("The vehicle is ready to be turned in to the ~y~garage~w~ at the docks.");
-			if (beep == 1)
+			if (play_notification_beeps == 1)
 				PlayNotificationBeep();
 			dropOff = UI::ADD_BLIP_FOR_COORD(1226.06f, -3231.36f, 6.02f);
 			if (blipStyle == 0)
@@ -564,7 +479,7 @@ void vehicle_collection_mission()
 			AI::TASK_LEAVE_VEHICLE(playerPed, collectible_vehicle, 0);
 			VEHICLE::SET_VEHICLE_UNDRIVEABLE(collectible_vehicle, 1);
 			NotifyAboveMap("Vehicle collected.\nReward: ~g~$2000~w~");
-			if (beep == 1)
+			if (play_notification_beeps == 1)
 				PlayNotificationBeep();
 			money_math();
 			UI::REMOVE_BLIP(&dropOff);
@@ -582,7 +497,7 @@ void vehicle_collection_mission()
 		if (!VEHICLE::IS_VEHICLE_DRIVEABLE(collectible_vehicle, 1) && mission_is_prepared)
 		{
 			NotifyAboveMap("The ~y~special vehicle~w~ has been destroyed.");
-			if (beep == 1)
+			if (play_notification_beeps == 1)
 				PlayNotificationBeep();
 
 			if (resprayed)
@@ -602,7 +517,7 @@ void vehicle_collection_mission()
 		if (eventOver && vehicleDistance > collection_mission_minimum_range_for_timeout || mission_is_prepared && ENTITY::IS_ENTITY_DEAD(playerPed))
 		{
 			NotifyAboveMap("The ~y~special vehicle~w~ is no longer requested.");
-			if (beep == 1)
+			if (play_notification_beeps == 1)
 				PlayNotificationBeep();
 
 			if (resprayed)
@@ -744,7 +659,7 @@ void PrepareDestroyVehicleMission()
 	mission_is_prepared = true;
 	type_of_event = 2;
 	NotifyAboveMap("A ~r~smuggler vehicle~w~ has been spotted.  Destroy it for a reward.");
-	if (beep == 1)
+	if (play_notification_beeps == 1)
 		PlayNotificationBeep();
 }
 
@@ -762,7 +677,7 @@ void arms_smuggler_mission()
 			UI::REMOVE_BLIP(&smugglerBlip);
 			ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&smugglerVehicle);
 			NotifyAboveMap("Vehicle destroyed.\nReward: ~g~$1000~w~");
-			if (beep == 1)
+			if (play_notification_beeps == 1)
 				PlayNotificationBeep();
 			mission_is_prepared = false;
 			eventOver = false;
@@ -772,7 +687,7 @@ void arms_smuggler_mission()
 		if (eventOver && vehicleDistance > 1000 || mission_is_prepared && ENTITY::IS_ENTITY_DEAD(playerPed))
 		{
 			NotifyAboveMap("The ~r~smuggler vehicle~w~ has been claimed by smugglers.");
-			if (beep == 1)
+			if (play_notification_beeps == 1)
 				PlayNotificationBeep();
 			UI::REMOVE_BLIP(&smugglerBlip);
 			ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&smugglerVehicle);
@@ -879,7 +794,7 @@ void PrepareCrateDropMission()
 		NotifyAboveMap("A ~y~special crate~w~ has been dropped.");
 	if (!specialCrate)
 		NotifyAboveMap("A ~g~crate~w~ has been dropped.");
-	if (beep == 1)
+	if (play_notification_beeps == 1)
 		PlayNotificationBeep();
 	mission_is_prepared = true;
 	type_of_event = 3;
@@ -1077,7 +992,7 @@ void crate_drop_mission()
 				NotifyAboveMap("The ~y~special crate~w~ has been claimed by smugglers.");
 			if (!specialCrate)
 				NotifyAboveMap("The ~g~crate~w~ has been claimed by smugglers.");
-			if (beep == 1)
+			if (play_notification_beeps == 1)
 				PlayNotificationBeep();
 			UI::REMOVE_BLIP(&crateBlip);
 			ENTITY::SET_OBJECT_AS_NO_LONGER_NEEDED(&crate);
@@ -1205,7 +1120,7 @@ void PrepareAssassinationMission()
 	mission_is_prepared = true;
 	type_of_event = 4;
 	NotifyAboveMap("A hit has been placed on a ~r~target~w~.  Kill them for a reward.");
-	if (beep == 1)
+	if (play_notification_beeps == 1)
 		PlayNotificationBeep();
 }
 
@@ -1223,7 +1138,7 @@ void assassination_mission()
 			UI::REMOVE_BLIP(&targetBlip);
 			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&target);
 			NotifyAboveMap("Target killed.\nReward: ~g~$1500~w~");
-			if (beep == 1)
+			if (play_notification_beeps == 1)
 				PlayNotificationBeep();
 			mission_is_prepared = false;
 			eventOver = false;
@@ -1233,7 +1148,7 @@ void assassination_mission()
 		if (eventOver && targetDistance > 1000 || mission_is_prepared && ENTITY::IS_ENTITY_DEAD(playerPed))
 		{
 			NotifyAboveMap("The hit on the ~r~target~w~ has expired.");
-			if (beep == 1)
+			if (play_notification_beeps == 1)
 				PlayNotificationBeep();
 			UI::REMOVE_BLIP(&targetBlip);
 			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&target);
@@ -1349,7 +1264,7 @@ void PrepareArmoredTruckMission()
 	mission_is_prepared = true;
 	type_of_event = 5;
 	NotifyAboveMap("An ~b~armored truck~w~ has been spotted carrying cash.");
-	if (beep == 1)
+	if (play_notification_beeps == 1)
 		PlayNotificationBeep();
 }
 
@@ -1401,7 +1316,7 @@ void armored_truck_mission()
 			ENTITY::SET_OBJECT_AS_NO_LONGER_NEEDED(&case1);
 
 			NotifyAboveMap("The ~b~armored truck's~w~ doors have opened.  Cash has been dropped.");
-			if (beep == 1)
+			if (play_notification_beeps == 1)
 				PlayNotificationBeep();
 			wanted = PLAYER::GET_PLAYER_WANTED_LEVEL(player);
 			if (wanted < 3)
@@ -1421,7 +1336,7 @@ void armored_truck_mission()
 		if (eventOver && truckDistance > 1000 || mission_is_prepared && ENTITY::IS_ENTITY_DEAD(playerPed))
 		{
 			NotifyAboveMap("The ~b~armored truck~w~ has finished carrying cash.");
-			if (beep == 1)
+			if (play_notification_beeps == 1)
 				PlayNotificationBeep();
 			ENTITY::SET_OBJECT_AS_NO_LONGER_NEEDED(&case1);
 			ENTITY::SET_OBJECT_AS_NO_LONGER_NEEDED(&case1);
@@ -1438,7 +1353,7 @@ void armored_truck_mission()
 		if (!VEHICLE::IS_VEHICLE_DRIVEABLE(truck, 1) && mission_is_prepared)
 		{
 			NotifyAboveMap("The ~b~armored truck~w~ has been destroyed.  The cash cases inside have been ruined.");
-			if (beep == 1)
+			if (play_notification_beeps == 1)
 				PlayNotificationBeep();
 			UI::REMOVE_BLIP(&truckBlip);
 			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&driver);
@@ -1453,12 +1368,16 @@ void armored_truck_mission()
 
 void update()
 {
+	Logger.Write("update()");
 	playerPed = PLAYER::PLAYER_PED_ID();
 	player = PLAYER::PLAYER_ID(); // need to be updated every cycle?
 
 	if (int(TIME::GET_CLOCK_MINUTES()) != timer_start_minute) {
+		Logger.Write("int(TIME::GET_CLOCK_MINUTES()) != timer_start_minute");
 		if (!mission_is_prepared) {
+			Logger.Write("!mission_is_prepared");
 			if (ready_to_prepare_mission) {
+				Logger.Write("ready_to_prepare_mission");
 				ready_to_prepare_mission = false;
 				waitTime = 0;
 				enum Mission {CollectVehicle, DestroyVehicle, Assassination, ArmoredTruck, CrateDrop};
@@ -1471,6 +1390,7 @@ void update()
 					case CrateDrop		: PrepareCrateDropMission()			; break;
 				}
 			} else {
+				Logger.Write("NOT ready_to_prepare_mission");
 				waitTime += 1;
 				if (waitTime == mission_start_delay_in_world_minutes)
 					ready_to_prepare_mission = true;
@@ -1485,20 +1405,27 @@ void update()
 		}
 		// timer_is_started = false;
 	}
+	Logger.Write("WAIT(DWORD(TIME::GET_MILLISECONDS_PER_GAME_MINUTE))");
+	Logger.Write("Milliseconds: " + std::to_string(DWORD(TIME::GET_MILLISECONDS_PER_GAME_MINUTE))[0u]);
 	WAIT(DWORD(TIME::GET_MILLISECONDS_PER_GAME_MINUTE)); // this should wait one game minute, right?
+	Logger.Write("Done waiting...");
 }
 
 void main()
 {
-
+	Logger.Write("main()");
+	
 	GetSettingsFromIniFile();
+	Logger.Write("entering InitialWaitForGame");
 	InitialWaitForGame(seconds_to_wait_for_vehicle_persistence_scripts);
+	Logger.Write("waiting is over, populating reserved_vehicle_spawn_points_parked");
 	if (seconds_to_wait_for_vehicle_persistence_scripts > 0) // no point in wasting spawns if the user doesn't use a persistence script.
-		GetParkedCarsInRange(reserved_vehicle_spawn_points_parked);
-
+		GetParkedCarsFromWorld(playerPed, reserved_vehicle_spawn_points_parked, maximum_number_of_spawn_points, vehicle_search_range_minimum);
+	Logger.Write("done...");
 	while (true)
 	{
-		GatherParkedVehicleSpawnPointsAndModels();
+		GetParkedCarsFromWorld(playerPed, vehicle_spawn_points, maximum_number_of_spawn_points, vehicle_search_range_minimum);
+		GetVehicleModelsFromWorld(playerPed, possible_vehicle_models, maximum_number_of_vehicle_models, vehicle_search_range_minimum);
 		vehicle_collection_mission();
 		arms_smuggler_mission();
 		crate_drop_mission();
@@ -1507,10 +1434,13 @@ void main()
 		update();
 		WAIT(0);
 	}
+
+	Logger.Close(); // I don't think this will ever happen...
 }
 
 void ScriptMain()
 {
+	Logger.Write("ScriptMain()");
 	srand(GetTickCount());
 	main();
 }
