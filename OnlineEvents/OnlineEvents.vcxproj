@@ -7,6 +7,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\inc\INIReader.cpp" />
+    <ClCompile Include="..\..\inc\INIWriter.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="script.cpp" />
   </ItemGroup>
@@ -46,7 +48,7 @@
     <TargetExt>.asi</TargetExt>
     <OutDir>D:\Program Files\Steam\SteamApps\common\Grand Theft Auto V</OutDir>
     <IntDir>tmp\$(Configuration)\</IntDir>
-    <IncludePath>C:\Users\lbodnyk\OneDrive - Dauphin County Library System\_Scripts\cplusplus\inc;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Users\Super\OneDrive - Dauphin County Library System\_Scripts\cplusplus\inc;C:\Users\lbodnyk\OneDrive - Dauphin County Library System\_Scripts\cplusplus\inc;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -59,7 +61,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;Pools_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <AdditionalIncludeDirectories>C:\Program Files (x86)\Windows Kits\10\Include\10.0.15063.0\um;$(WindowsSdkDir)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\Super\OneDrive - Dauphin County Library System\_Scripts\cplusplus\OnlineEvents\OnlineEvents;C:\Program Files (x86)\Windows Kits\10\Include\10.0.15063.0\um;$(WindowsSdkDir)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
