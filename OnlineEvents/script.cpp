@@ -50,9 +50,9 @@ int red2, green2, blue2;
 int Sred1, Sgreen1, Sblue1;
 int Sred2, Sgreen2, Sblue2;
 //int primary1, secondary1;
-int primary2, secondary2;
+int vehicle_primary_color_compare_, secondary2;
 int wanted;
-Blip dropOff;
+Blip drop_off_blip_;
 Vehicle smugglerVehicle;
 Blip smugglerBlip;
 Blip crateBlip;
@@ -1140,9 +1140,12 @@ public:
 	MissionType Execute();
 private:
 	Vehicle vehicle_to_steal_ = NULL;
+	Vector3 drop_off_coordinates = { 1226.06, -3231.36, 6.02 };
 	Blip vehicle_blip_ = NULL;
-	int vehicle_primary_color_1_, vehicle_secondary_color_1_;
-	enum MissionStage { Nothing, GotCarAndIsWanted,  };
+	Blip drop_off_blip_ = NULL;
+	int vehicle_primary_color_initial_, vehicle_secondary_color_initial_;
+	int vehicle_primary_color_compare_, vehicle_secondary_color_compare_;
+	enum MissionStage { Nothing, GotCarAndIsWanted, ResprayedVehicle };
 	MissionStage mission_stage_ = Nothing;
 };
 
@@ -1182,7 +1185,7 @@ MissionType StealVehicleMission::Prepare() {
 	UI::SET_BLIP_COLOUR(vehicle_blip_, 5);
 	UI::SET_BLIP_DISPLAY(vehicle_blip_, (char)"you will never see this");
 
-	VEHICLE::GET_VEHICLE_COLOURS(vehicle_to_steal_, &vehicle_primary_color_1_, &vehicle_secondary_color_1_);
+	VEHICLE::GET_VEHICLE_COLOURS(vehicle_to_steal_, &vehicle_primary_color_initial_, &vehicle_secondary_color_initial_);
 
 	CreateNotification("A ~y~special vehicle~w~ has been requested for pickup.", play_notification_beeps);
 	return StealVehicle;
@@ -1191,32 +1194,32 @@ MissionType StealVehicleMission::Prepare() {
 MissionType StealVehicleMission::Execute() {
 	Vector3 player_coordinates = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
 	Vector3 vehicle_coordinates = ENTITY::GET_ENTITY_COORDS(vehicle_to_steal_, 0);
-	float dropOffDistance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(vehicle_coordinates.x, vehicle_coordinates.y, vehicle_coordinates.z, 1226.06, -3231.36, 6.02, 0);
+	float dropOffDistance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(vehicle_coordinates.x, vehicle_coordinates.y, vehicle_coordinates.z, drop_off_coordinates.x, drop_off_coordinates.y, drop_off_coordinates.z, 0);
 	uint vehicleDistance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(vehicle_coordinates.x, vehicle_coordinates.y, vehicle_coordinates.z, player_coordinates.x, player_coordinates.y, player_coordinates.z, 0);
 
-	if (PED::IS_PED_IN_VEHICLE(playerPed, vehicle_to_steal_, 0) && !(mission_stage_ == Nothing)) {
+	if (PED::IS_PED_IN_VEHICLE(playerPed, vehicle_to_steal_, 0) && (mission_stage_ == Nothing)) {
 		SetPlayerMinimumWantedLevel(Wanted_Two);
 		CreateNotification("Respray the vehicle before turning it in.", play_notification_beeps);
 		mission_stage_ = GotCarAndIsWanted;
 	}
 
-	VEHICLE::GET_VEHICLE_COLOURS(vehicle_to_steal_, &primary2, &secondary2);
-	//VEHICLE::GET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle_to_steal_, &red2, &green2, &blue2); // it doesn't look like these are ever used!
-	//if (VEHICLE::_DOES_VEHICLE_HAVE_SECONDARY_COLOUR(collectVehicle))
-	//VEHICLE::GET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle_to_steal_, &Sred2, &Sgreen2, &Sblue2); // it doesn't look like these are ever used!
-
-	if (vehicle_primary_color_1_ != primary2 && ENTITY::GET_ENTITY_SPEED(vehicle_to_steal_) != 0 && !resprayed ||
-		vehicle_secondary_color_1_ != secondary2  && ENTITY::GET_ENTITY_SPEED(vehicle_to_steal_) != 0 && !resprayed) {
+	VEHICLE::GET_VEHICLE_COLOURS(vehicle_to_steal_, &vehicle_primary_color_compare_, &vehicle_secondary_color_compare_);
+	if (vehicle_primary_color_initial_		!= vehicle_primary_color_compare_	&& ENTITY::GET_ENTITY_SPEED(vehicle_to_steal_) != 0 && (mission_stage_ == GotCarAndIsWanted) ||
+		vehicle_secondary_color_initial_	!= vehicle_secondary_color_compare_	&& ENTITY::GET_ENTITY_SPEED(vehicle_to_steal_) != 0 && (mission_stage_ == GotCarAndIsWanted)) {
+		drop_off_blip_ = UI::ADD_BLIP_FOR_COORD(drop_off_coordinates.x, drop_off_coordinates.y, drop_off_coordinates.z);
+		if (blip_style == 0) UI::SET_BLIP_SPRITE(drop_off_blip_, 50);
+		else UI::SET_BLIP_SPRITE(drop_off_blip_, 1);
+		UI::SET_BLIP_COLOUR(drop_off_blip_, 5);
+		UI::SET_BLIP_DISPLAY(drop_off_blip_, (char)"you will never see this");
 		CreateNotification("The vehicle is ready to be turned in to the ~y~garage~w~ at the docks.", play_notification_beeps);
-		dropOff = UI::ADD_BLIP_FOR_COORD(1226.06f, -3231.36f, 6.02f);
-		if (blip_style == 0) UI::SET_BLIP_SPRITE(dropOff, 50);
-		else UI::SET_BLIP_SPRITE(dropOff, 1);
-		UI::SET_BLIP_COLOUR(dropOff, 5);
-		UI::SET_BLIP_DISPLAY(dropOff, (char)"you will never see this");
-		resprayed = true;
+		mission_stage_ = ResprayedVehicle;
 	}
 
-	if (resprayed && mission_is_prepared) GRAPHICS::DRAW_MARKER(1, 1226.06, -3231.36, 4.9, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 5.0f, 5.0f, 1.0f, 204, 204, 0, 100, false, false, 2, false, false, false, false);
+	if (mission_stage_ = ResprayedVehicle) GRAPHICS::DRAW_MARKER(1, drop_off_coordinates.x, -3231.36, 4.9, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 5.0f, 5.0f, 1.0f, 204, 204, 0, 100, false, false, 2, false, false, false, false);
+
+
+
+	// HERE! HERE! HERE! HERE! HERE! HERE! HERE! HERE! HERE! HERE! HERE! HERE! HERE! HERE! HERE! HERE! HERE! HERE! 
 
 	if (dropOffDistance < 0.7f && PED::IS_PED_IN_VEHICLE(playerPed, vehicle_to_steal_, 0) && resprayed && mission_is_prepared) {
 		VEHICLE::SET_VEHICLE_FORWARD_SPEED(vehicle_to_steal_, 0.0f);
@@ -1225,7 +1228,7 @@ MissionType StealVehicleMission::Execute() {
 		VEHICLE::SET_VEHICLE_UNDRIVEABLE(vehicle_to_steal_, 1);
 		CreateNotification("Vehicle collected.\nReward: ~g~$2000~w~", play_notification_beeps);
 		money_math();
-		UI::REMOVE_BLIP(&dropOff);
+		UI::REMOVE_BLIP(&drop_off_blip_);
 		UI::REMOVE_BLIP(&vehicle_blip_);
 		ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&vehicle_to_steal_);
 		mission_is_prepared = false; player_acquired_vehicle_ = false; resprayed = false; blipMade = false; eventOver = false; missionTime = 0;
@@ -1233,7 +1236,7 @@ MissionType StealVehicleMission::Execute() {
 
 	if (!VEHICLE::IS_VEHICLE_DRIVEABLE(vehicle_to_steal_, 1) && mission_is_prepared) {
 		CreateNotification("The ~y~special vehicle~w~ has been destroyed.", play_notification_beeps);
-		if (resprayed) UI::REMOVE_BLIP(&dropOff);
+		if (resprayed) UI::REMOVE_BLIP(&drop_off_blip_);
 		UI::REMOVE_BLIP(&vehicle_blip_);
 		ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&vehicle_to_steal_);
 		mission_is_prepared = false; player_acquired_vehicle_ = false; resprayed = false; blipMade = false; eventOver = false; missionTime = 0;
@@ -1241,7 +1244,7 @@ MissionType StealVehicleMission::Execute() {
 
 	if (eventOver && vehicleDistance > collection_mission_minimum_range_for_timeout || mission_is_prepared && ENTITY::IS_ENTITY_DEAD(playerPed)) {
 		CreateNotification("The ~y~special vehicle~w~ is no longer requested.", play_notification_beeps);
-		if (resprayed) UI::REMOVE_BLIP(&dropOff);
+		if (resprayed) UI::REMOVE_BLIP(&drop_off_blip_);
 		UI::REMOVE_BLIP(&vehicle_blip_);
 		ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&vehicle_to_steal_);
 		mission_is_prepared = false; player_acquired_vehicle_ = false; resprayed = false; blipMade = false; eventOver = false; missionTime = 0;
