@@ -5,8 +5,7 @@
 #include <fstream>
 #include <Windows.h>
 
-class Log
-{
+class Log {
 public:
 	Log(std::string filename);
 	void Write(std::string string);

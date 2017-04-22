@@ -16,8 +16,9 @@
 #include "Log.h"
 //#include "keyboard.h"
 
-CIniReader reader(".\\OnlineEvents.ini");
+CIniReader Reader(".\\OnlineEvents.ini");
 Log Logger(".\\OnlineEvents.log");
+
 
 typedef struct { float x; DWORD _paddingx; float y; DWORD _paddingy; float z; DWORD _paddingz; float h; DWORD _paddingw; } Vector4;
 
@@ -38,17 +39,17 @@ bool eventOver = false;
 bool specialCrate = false;
 int model;
 int val;
-Vehicle collectible_vehicle;
+Vehicle vehicle_to_steal;
 Blip vehicle_blip;
-bool wantedSet = false;
-bool gotColor = false;
+// bool player_acquired_vehicle_ = false;
+//bool gotColor = false;
 bool resprayed = false;
 bool blipMade = false;
 int red1, green1, blue1;
 int red2, green2, blue2;
 int Sred1, Sgreen1, Sblue1;
 int Sred2, Sgreen2, Sblue2;
-int primary1, secondary1;
+//int primary1, secondary1;
 int primary2, secondary2;
 int wanted;
 Blip dropOff;
@@ -75,19 +76,21 @@ bool driverMade = false;
 
 Ped playerPed; // breaks naming convention because 
 Player player;
-int game_clock_minutes;
-bool a_mission_is_running = false;
 std::vector<Vector4> reserved_vehicle_spawn_points_parked;
 std::vector<Vector4> vehicle_spawn_points;
 std::vector<Hash> possible_vehicle_models;
+enum MissionType { StealVehicle, DestroyVehicle, Assassination, ArmoredTruck, CrateDrop, MAX_Mission, NO_Mission };
+enum WantedLevel { Wanted_Zero, Wanted_One, Wanted_Two, Wanted_Three, Wanted_Four, Wanted_Five };
 
-int play_notification_beeps, mission_timeout, mission_cooldown, blipStyle;
-int seconds_to_wait_for_vehicle_persistence_scripts;
-int maximum_number_of_spawn_points, maximum_number_of_vehicle_models, vehicle_search_range_minimum;
-int vehicle_spawn_point_minimum_range, vehicle_spawn_point_maximum_range;
-int collection_mission_minimum_range_for_timeout;
+bool play_notification_beeps;
+ULONGLONG mission_cooldown;
+uint mission_timeout, blip_style;
+uint maximum_number_of_spawn_points, maximum_number_of_vehicle_models, vehicle_search_range_minimum;
+uint vehicle_spawn_point_minimum_range, vehicle_spawn_point_maximum_range;
+uint collection_mission_minimum_range_for_timeout;
 bool notify_get_parked_cars_in_range;
 bool notify_number_of_possible_vehicle_models, notify_number_of_possible_spawn_points, notify_distance_to_spawn_point, notify_number_of_reserved_spawn_points;
+uint seconds_to_wait_for_vehicle_persistence_scripts, number_of_tries_to_find_spawn_point;
 
 void NotifyBottomCenter(char* message) {
 	UI::BEGIN_TEXT_COMMAND_PRINT("STRING");
@@ -188,7 +191,14 @@ Hash GetHashOfVehicleModel(Vehicle vehicle) {
 	return ENTITY::GET_ENTITY_MODEL(vehicle);
 }
 
-void ExecuteCrateDropMission()
+void SetPlayerMinimumWantedLevel(WantedLevel wanted_level) {
+	if (PLAYER::GET_PLAYER_WANTED_LEVEL(player) < wanted_level) {
+		PLAYER::SET_PLAYER_WANTED_LEVEL(player, wanted_level, 0);
+		PLAYER::SET_PLAYER_WANTED_LEVEL_NOW(player, 1);
+	}
+}
+
+MissionType ExecuteCrateDropMission()
 {
 	if (mission_is_prepared && type_of_event == 3)
 	{
@@ -207,7 +217,7 @@ void ExecuteCrateDropMission()
 			ENTITY::FREEZE_ENTITY_POSITION(crate, 1);
 			UI::REMOVE_BLIP(&crateBlip);
 			crateBlip = UI::ADD_BLIP_FOR_ENTITY(crate);
-			if (blipStyle == 0)
+			if (blip_style == 0)
 				UI::SET_BLIP_SPRITE(crateBlip, 306);
 			else
 				UI::SET_BLIP_SPRITE(crateBlip, 1);
@@ -398,7 +408,7 @@ void ExecuteCrateDropMission()
 	}
 }
 
-void ExecuteArmoredTruckMission()
+MissionType ExecuteArmoredTruckMission()
 {
 	if (mission_is_prepared && type_of_event == 5)
 	{
@@ -485,7 +495,7 @@ void ExecuteArmoredTruckMission()
 	}
 }
 
-void ExecuteAssassinationMission()
+MissionType ExecuteAssassinationMission()
 {
 	if (mission_is_prepared && type_of_event == 4)
 	{
@@ -516,7 +526,7 @@ void ExecuteAssassinationMission()
 	}
 }
 
-void ExecuteDestroyVehicleMission()
+MissionType ExecuteDestroyVehicleMission()
 {
 	if (mission_is_prepared && type_of_event == 2)
 	{
@@ -547,115 +557,9 @@ void ExecuteDestroyVehicleMission()
 	}
 }
 
-void ExecuteStealVehicleMission()
-{
-	if (mission_is_prepared && type_of_event == 1)
-	{
-		Vector3 position = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
-		Vector3 vehiclePos = ENTITY::GET_ENTITY_COORDS(collectible_vehicle, 0);
-		float dropOffDistance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(vehiclePos.x, vehiclePos.y, vehiclePos.z, 1226.06, -3231.36, 6.02, 0);
-		int vehicleDistance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(vehiclePos.x, vehiclePos.y, vehiclePos.z, position.x, position.y, position.z, 0);
-
-		if (PED::IS_PED_IN_VEHICLE(playerPed, collectible_vehicle, 0) && !wantedSet)
-		{
-			wanted = PLAYER::GET_PLAYER_WANTED_LEVEL(player);
-			if (wanted < 2)
-			{
-				PLAYER::SET_PLAYER_WANTED_LEVEL(player, 2, 0);
-				PLAYER::SET_PLAYER_WANTED_LEVEL_NOW(player, 1);
-			}
-			wantedSet = true;
-			CreateNotification("Respray the vehicle before turning it in.", play_notification_beeps);
-		}
-
-		if (!gotColor)
-		{
-			VEHICLE::GET_VEHICLE_COLOURS(collectible_vehicle, &primary1, &secondary1);
-			gotColor = true;
-		}
-
-		VEHICLE::GET_VEHICLE_COLOURS(collectible_vehicle, &primary2, &secondary2);
-		VEHICLE::GET_VEHICLE_CUSTOM_PRIMARY_COLOUR(collectible_vehicle, &red2, &green2, &blue2);
-		//if (VEHICLE::_DOES_VEHICLE_HAVE_SECONDARY_COLOUR(collectVehicle))
-		VEHICLE::GET_VEHICLE_CUSTOM_SECONDARY_COLOUR(collectible_vehicle, &Sred2, &Sgreen2, &Sblue2);
-
-		if (primary1 != primary2 && ENTITY::GET_ENTITY_SPEED(collectible_vehicle) != 0 && !resprayed ||
-			secondary1 != secondary2  && ENTITY::GET_ENTITY_SPEED(collectible_vehicle) != 0 && !resprayed)
-		{
-			CreateNotification("The vehicle is ready to be turned in to the ~y~garage~w~ at the docks.", play_notification_beeps);
-			dropOff = UI::ADD_BLIP_FOR_COORD(1226.06f, -3231.36f, 6.02f);
-			if (blipStyle == 0)
-				UI::SET_BLIP_SPRITE(dropOff, 50);
-			else
-				UI::SET_BLIP_SPRITE(dropOff, 1);
-			UI::SET_BLIP_COLOUR(dropOff, 5);
-			UI::SET_BLIP_DISPLAY(dropOff, (char)"you will never see this");
-			resprayed = true;
-		}
-
-		if (resprayed && mission_is_prepared)
-		{
-			GRAPHICS::DRAW_MARKER(1, 1226.06, -3231.36, 4.9, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 5.0f, 5.0f, 1.0f, 204, 204, 0, 100, false, false, 2, false, false, false, false);
-		}
-
-		if (dropOffDistance < 0.7f && PED::IS_PED_IN_VEHICLE(playerPed, collectible_vehicle, 0) && resprayed && mission_is_prepared)
-		{
-			VEHICLE::SET_VEHICLE_FORWARD_SPEED(collectible_vehicle, 0.0f);
-			while (ENTITY::GET_ENTITY_SPEED(collectible_vehicle) != 0)
-				WAIT(0);
-			AI::TASK_LEAVE_VEHICLE(playerPed, collectible_vehicle, 0);
-			VEHICLE::SET_VEHICLE_UNDRIVEABLE(collectible_vehicle, 1);
-			CreateNotification("Vehicle collected.\nReward: ~g~$2000~w~", play_notification_beeps);
-			money_math();
-			UI::REMOVE_BLIP(&dropOff);
-			UI::REMOVE_BLIP(&vehicle_blip);
-			ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&collectible_vehicle);
-			mission_is_prepared = false;
-			wantedSet = false;
-			gotColor = false;
-			resprayed = false;
-			blipMade = false;
-			eventOver = false;
-			missionTime = 0;
-		}
-
-		if (!VEHICLE::IS_VEHICLE_DRIVEABLE(collectible_vehicle, 1) && mission_is_prepared)
-		{
-			CreateNotification("The ~y~special vehicle~w~ has been destroyed.", play_notification_beeps);
-
-			if (resprayed)
-				UI::REMOVE_BLIP(&dropOff);
-
-			UI::REMOVE_BLIP(&vehicle_blip);
-			ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&collectible_vehicle);
-			mission_is_prepared = false;
-			wantedSet = false;
-			gotColor = false;
-			resprayed = false;
-			blipMade = false;
-			eventOver = false;
-			missionTime = 0;
-		}
-
-		if (eventOver && vehicleDistance > collection_mission_minimum_range_for_timeout || mission_is_prepared && ENTITY::IS_ENTITY_DEAD(playerPed))
-		{
-			CreateNotification("The ~y~special vehicle~w~ is no longer requested.", play_notification_beeps);
-
-			if (resprayed)
-				UI::REMOVE_BLIP(&dropOff);
-
-			UI::REMOVE_BLIP(&vehicle_blip);
-			ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&collectible_vehicle);
-			mission_is_prepared = false;
-			wantedSet = false;
-			gotColor = false;
-			resprayed = false;
-			blipMade = false;
-			eventOver = false;
-			missionTime = 0;
-		}
-	}
-}
+//MissionType ExecuteStealVehicleMission() {
+//		
+//}
 
 void PrepareCrateDropMission()
 {
@@ -736,7 +640,7 @@ void PrepareCrateDropMission()
 	if (random == 20)
 		specialCrate = true;
 	crateBlip = UI::ADD_BLIP_FOR_COORD(crateSpawn.x, crateSpawn.y, crateSpawn.z);
-	if (blipStyle == 0)
+	if (blip_style == 0)
 		UI::SET_BLIP_SPRITE(crateBlip, 306);
 	else
 		UI::SET_BLIP_SPRITE(crateBlip, 1);
@@ -847,7 +751,7 @@ void PrepareArmoredTruckMission()
 	armored_truck = VEHICLE::CREATE_VEHICLE(GAMEPLAY::GET_HASH_KEY("stockade"), spawn.x, spawn.y, spawn.z, heading, 0, 0);
 	VEHICLE::SET_VEHICLE_ON_GROUND_PROPERLY(armored_truck);
 	truckBlip = UI::ADD_BLIP_FOR_ENTITY(armored_truck);
-	if (blipStyle == 0)
+	if (blip_style == 0)
 		UI::SET_BLIP_SPRITE(truckBlip, 67);
 	else
 		UI::SET_BLIP_SPRITE(truckBlip, 1);
@@ -951,7 +855,7 @@ void PrepareAssassinationMission()
 	PED::SET_PED_DESIRED_HEADING(assassination_target, heading);
 	targetBlip = UI::ADD_BLIP_FOR_ENTITY(assassination_target);
 	AI::TASK_WANDER_STANDARD(assassination_target, 1000.0f, 0);
-	if (blipStyle == 0)
+	if (blip_style == 0)
 		UI::SET_BLIP_SPRITE(targetBlip, 432);
 	else
 		UI::SET_BLIP_SPRITE(targetBlip, 1);
@@ -1066,7 +970,7 @@ void PrepareDestroyVehicleMission()
 	smugglerVehicle = VEHICLE::CREATE_VEHICLE(vehicle, spawn.x, spawn.y, spawn.z, heading, 0, 0);
 	VEHICLE::SET_VEHICLE_ON_GROUND_PROPERLY(smugglerVehicle);
 	smugglerBlip = UI::ADD_BLIP_FOR_ENTITY(smugglerVehicle);
-	if (blipStyle == 0)
+	if (blip_style == 0)
 	{
 		if (VEHICLE::IS_THIS_MODEL_A_CAR(vehicle))
 			UI::SET_BLIP_SPRITE(smugglerBlip, 225);
@@ -1084,55 +988,43 @@ void PrepareDestroyVehicleMission()
 	CreateNotification("A ~r~smuggler vehicle~w~ has been spotted.  Destroy it for a reward.", play_notification_beeps);
 }
 
-void PrepareStealVehicleMission()
-{
-	//NotifyAboveMap(&("Reserved Spawn Points: " + std::to_string(reserved_vehicle_spawn_points_parked.size()))[0u]);
-	Logger.Write("PrepareCollectibleVehicleMission()");
-	Logger.Write("Reserved Spawn Points: " + std::to_string(reserved_vehicle_spawn_points_parked.size())[0u]);
-	Vector3 player_coordinates = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
-	Vector4 vehicle_spawn_point_to_use;
-	int tries = 0;
-	while (true)
-	{
-		vehicle_spawn_point_to_use = vehicle_spawn_points[(rand() % vehicle_spawn_points.size())]; // pick a random possible point from our set
-		float distance_between_player_and_spawn_point = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, vehicle_spawn_point_to_use.x, vehicle_spawn_point_to_use.y, vehicle_spawn_point_to_use.z, 0);
-		if (distance_between_player_and_spawn_point > vehicle_spawn_point_minimum_range &&
-			distance_between_player_and_spawn_point < vehicle_spawn_point_maximum_range)
-		{
-			if (notify_distance_to_spawn_point) CreateNotification(&("Distance to Spawn: " + std::to_string(distance_between_player_and_spawn_point))[0u], play_notification_beeps); // combined into one line I hope it works...
-			break;
-		}
-		//tries += 1;
-		if (tries++ > 1000)
-		{
-			CreateNotification("failed to find a spawn point, one thousand times!", play_notification_beeps);
-			return;
-		}
-		WAIT(0);
-	}
-
-	Hash vehicle_model_to_use = possible_vehicle_models[(rand() % possible_vehicle_models.size())]; // pick a random model from our set, pray that it's still loaded in memory?
-	STREAMING::REQUEST_MODEL(vehicle_model_to_use);
-	while (!STREAMING::HAS_MODEL_LOADED(vehicle_model_to_use))
-		WAIT(0);
-	collectible_vehicle = VEHICLE::CREATE_VEHICLE(vehicle_model_to_use, vehicle_spawn_point_to_use.x, vehicle_spawn_point_to_use.y, vehicle_spawn_point_to_use.z, vehicle_spawn_point_to_use.h, 0, 0);
-	VEHICLE::SET_VEHICLE_ON_GROUND_PROPERLY(collectible_vehicle);
-	vehicle_blip = UI::ADD_BLIP_FOR_ENTITY(collectible_vehicle);
-	if (blipStyle == 0)
-	{
-		if (VEHICLE::IS_THIS_MODEL_A_CAR(GetHashOfVehicleModel(collectible_vehicle))) UI::SET_BLIP_SPRITE(vehicle_blip, 225);
-		else UI::SET_BLIP_SPRITE(vehicle_blip, 226);
-	}
-	else
-	{
-		UI::SET_BLIP_SPRITE(vehicle_blip, 1);
-	}
-	UI::SET_BLIP_COLOUR(vehicle_blip, 5);
-	UI::SET_BLIP_DISPLAY(vehicle_blip, (char)"you will never see this");
-	mission_is_prepared = true;
-	type_of_event = 1;
-	CreateNotification("A ~y~special vehicle~w~ has been requested for pickup.", play_notification_beeps);
-}
+//void PrepareStealVehicleMission() {
+//	Logger.Write("PrepareStealVehicleMission()");
+//	Logger.Write("Reserved Spawn Points: " + std::to_string(reserved_vehicle_spawn_points_parked.size())[0u]);
+//	Vector3 player_coordinates = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
+//	Vector4 vehicle_spawn_point_to_use;
+//	int tries = 0;
+//	while (true) {
+//		vehicle_spawn_point_to_use = vehicle_spawn_points[(rand() % vehicle_spawn_points.size())]; // pick a random possible point from our set
+//		float distance_between_player_and_spawn_point = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, vehicle_spawn_point_to_use.x, vehicle_spawn_point_to_use.y, vehicle_spawn_point_to_use.z, 0);
+//		if (distance_between_player_and_spawn_point > vehicle_spawn_point_minimum_range &&
+//			distance_between_player_and_spawn_point < vehicle_spawn_point_maximum_range) {
+//			if (notify_distance_to_spawn_point) CreateNotification(&("Distance to Spawn: " + std::to_string(distance_between_player_and_spawn_point))[0u], play_notification_beeps); // combined into one line I hope it works...
+//			break;
+//		}
+//		if (tries++ > 100) {
+//			CreateNotification("failed to find a spawn point, one thousand times!", play_notification_beeps);
+//			return;
+//		}
+//		WAIT(0);
+//	}
+//
+//	Hash vehicle_model_to_use = possible_vehicle_models[(rand() % possible_vehicle_models.size())]; // pick a random model from our set, pray that it's still loaded in memory?
+//	STREAMING::REQUEST_MODEL(vehicle_model_to_use);
+//	while (!STREAMING::HAS_MODEL_LOADED(vehicle_model_to_use)) WAIT(0);
+//	vehicle_to_steal = VEHICLE::CREATE_VEHICLE(vehicle_model_to_use, vehicle_spawn_point_to_use.x, vehicle_spawn_point_to_use.y, vehicle_spawn_point_to_use.z, vehicle_spawn_point_to_use.h, 0, 0);
+//	VEHICLE::SET_VEHICLE_ON_GROUND_PROPERLY(vehicle_to_steal);
+//	
+//	vehicle_blip = UI::ADD_BLIP_FOR_ENTITY(vehicle_to_steal);
+//	if (blip_style == 0) {
+//		if (VEHICLE::IS_THIS_MODEL_A_CAR(GetHashOfVehicleModel(vehicle_to_steal))) UI::SET_BLIP_SPRITE(vehicle_blip, 225);
+//		else UI::SET_BLIP_SPRITE(vehicle_blip, 226);
+//	} else UI::SET_BLIP_SPRITE(vehicle_blip, 1);
+//	UI::SET_BLIP_COLOUR(vehicle_blip, 5);
+//	UI::SET_BLIP_DISPLAY(vehicle_blip, (char)"you will never see this");
+//	
+//	CreateNotification("A ~y~special vehicle~w~ has been requested for pickup.", play_notification_beeps);
+//}
 
 bool IsVehicleProbablyParked(Vehicle vehicle) {
 	if ((VEHICLE::IS_VEHICLE_STOPPED(vehicle)) &&
@@ -1163,21 +1055,6 @@ bool IsVehicleDrivable(Vehicle vehicle) {
 
 bool DoesEntityExistAndIsNotNull(Entity entity) {
 	return (entity != NULL && ENTITY::DOES_ENTITY_EXIST(entity));
-}
-
-// FOURTH ORDER
-
-void StartAMission() {
-	enum Mission { StealVehicle, DestroyVehicle, Assassination, ArmoredTruck, CrateDrop };
-	Mission mission = Mission(rand() % 5); // no method for getting length of enum == poor show.
-	switch (mission) {
-		case StealVehicle	:	PrepareStealVehicleMission();	break;
-		case DestroyVehicle	:	PrepareDestroyVehicleMission(); break;
-		case Assassination	:	PrepareAssassinationMission();	break;
-		case ArmoredTruck	:	PrepareArmoredTruckMission();	break;
-		case CrateDrop		:	PrepareCrateDropMission();		break;
-	}
-	a_mission_is_running = false;
 }
 
 std::vector<Hash> GetVehicleModelsFromWorld(Ped ped, std::vector<Hash> vector_of_hashes, int maximum_vector_size, int search_range_minimum) {
@@ -1257,22 +1134,164 @@ std::vector<Vector4> GetParkedCarsFromWorld(Ped ped, std::vector<Vector4> vector
 	return vector_of_vector4s;
 }
 
-// THIRD ORDER
+class StealVehicleMission {
+public:
+	MissionType Prepare();
+	MissionType Execute();
+private:
+	Vehicle vehicle_to_steal_ = NULL;
+	Blip vehicle_blip_ = NULL;
+	int vehicle_primary_color_1_, vehicle_secondary_color_1_;
+	enum MissionStage { Nothing, GotCarAndIsWanted,  };
+	MissionStage mission_stage_ = Nothing;
+};
 
-void MissionHandler(ULONGLONG ticks_since) {
-	uint time_since_last_mission = 0;
-
-	if ((!a_mission_is_running) && (time_since_last_mission > mission_cooldown)) {
-		StartAMission();
+MissionType StealVehicleMission::Prepare() {
+	Logger.Write("PrepareStealVehicleMission()");
+	Logger.Write("Reserved Spawn Points: " + std::to_string(reserved_vehicle_spawn_points_parked.size())[0u]);
+	Vector3 player_coordinates = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
+	Vector4 vehicle_spawn_point_to_use;
+	int tries = 0;
+	while (true) {
+		vehicle_spawn_point_to_use = vehicle_spawn_points[(rand() % vehicle_spawn_points.size())]; // pick a random possible point from our set
+		float distance_between_player_and_spawn_point = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, vehicle_spawn_point_to_use.x, vehicle_spawn_point_to_use.y, vehicle_spawn_point_to_use.z, 0);
+		if (distance_between_player_and_spawn_point > vehicle_spawn_point_minimum_range &&
+			distance_between_player_and_spawn_point < vehicle_spawn_point_maximum_range) {
+			if (notify_distance_to_spawn_point) CreateNotification(&("Distance to Spawn: " + std::to_string(distance_between_player_and_spawn_point))[0u], play_notification_beeps); // combined into one line I hope it works...
+			break;
+		}
+		if (tries++ > 100) {
+			CreateNotification("failed to find a spawn point, one thousand times!", play_notification_beeps);
+			return;
+		}
+		WAIT(0);
 	}
-	Logger.Write("Milliseconds: " + std::to_string(DWORD(TIME::GET_MILLISECONDS_PER_GAME_MINUTE))[0u]);
-	//WAIT(DWORD(TIME::GET_MILLISECONDS_PER_GAME_MINUTE)); // this should wait one game minute, right?
+
+	Hash vehicle_model_to_use = possible_vehicle_models[(rand() % possible_vehicle_models.size())]; // pick a random model from our set, pray that it's still loaded in memory?
+	STREAMING::REQUEST_MODEL(vehicle_model_to_use);
+	while (!STREAMING::HAS_MODEL_LOADED(vehicle_model_to_use)) WAIT(0);
+	vehicle_to_steal_ = VEHICLE::CREATE_VEHICLE(vehicle_model_to_use, vehicle_spawn_point_to_use.x, vehicle_spawn_point_to_use.y, vehicle_spawn_point_to_use.z, vehicle_spawn_point_to_use.h, 0, 0);
+	VEHICLE::SET_VEHICLE_ON_GROUND_PROPERLY(vehicle_to_steal_);
+
+	vehicle_blip_ = UI::ADD_BLIP_FOR_ENTITY(vehicle_to_steal_);
+	if (blip_style == 0) {
+		if (VEHICLE::IS_THIS_MODEL_A_CAR(GetHashOfVehicleModel(vehicle_to_steal_))) UI::SET_BLIP_SPRITE(vehicle_blip_, 225);
+		else UI::SET_BLIP_SPRITE(vehicle_blip_, 226);
+	}
+	else UI::SET_BLIP_SPRITE(vehicle_blip_, 1);
+	UI::SET_BLIP_COLOUR(vehicle_blip_, 5);
+	UI::SET_BLIP_DISPLAY(vehicle_blip_, (char)"you will never see this");
+
+	VEHICLE::GET_VEHICLE_COLOURS(vehicle_to_steal_, &vehicle_primary_color_1_, &vehicle_secondary_color_1_);
+
+	CreateNotification("A ~y~special vehicle~w~ has been requested for pickup.", play_notification_beeps);
+	return StealVehicle;
+}
+
+MissionType StealVehicleMission::Execute() {
+	Vector3 player_coordinates = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
+	Vector3 vehicle_coordinates = ENTITY::GET_ENTITY_COORDS(vehicle_to_steal_, 0);
+	float dropOffDistance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(vehicle_coordinates.x, vehicle_coordinates.y, vehicle_coordinates.z, 1226.06, -3231.36, 6.02, 0);
+	uint vehicleDistance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(vehicle_coordinates.x, vehicle_coordinates.y, vehicle_coordinates.z, player_coordinates.x, player_coordinates.y, player_coordinates.z, 0);
+
+	if (PED::IS_PED_IN_VEHICLE(playerPed, vehicle_to_steal_, 0) && !(mission_stage_ == Nothing)) {
+		SetPlayerMinimumWantedLevel(Wanted_Two);
+		CreateNotification("Respray the vehicle before turning it in.", play_notification_beeps);
+		mission_stage_ = GotCarAndIsWanted;
+	}
+
+	VEHICLE::GET_VEHICLE_COLOURS(vehicle_to_steal_, &primary2, &secondary2);
+	//VEHICLE::GET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle_to_steal_, &red2, &green2, &blue2); // it doesn't look like these are ever used!
+	//if (VEHICLE::_DOES_VEHICLE_HAVE_SECONDARY_COLOUR(collectVehicle))
+	//VEHICLE::GET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle_to_steal_, &Sred2, &Sgreen2, &Sblue2); // it doesn't look like these are ever used!
+
+	if (vehicle_primary_color_1_ != primary2 && ENTITY::GET_ENTITY_SPEED(vehicle_to_steal_) != 0 && !resprayed ||
+		vehicle_secondary_color_1_ != secondary2  && ENTITY::GET_ENTITY_SPEED(vehicle_to_steal_) != 0 && !resprayed) {
+		CreateNotification("The vehicle is ready to be turned in to the ~y~garage~w~ at the docks.", play_notification_beeps);
+		dropOff = UI::ADD_BLIP_FOR_COORD(1226.06f, -3231.36f, 6.02f);
+		if (blip_style == 0) UI::SET_BLIP_SPRITE(dropOff, 50);
+		else UI::SET_BLIP_SPRITE(dropOff, 1);
+		UI::SET_BLIP_COLOUR(dropOff, 5);
+		UI::SET_BLIP_DISPLAY(dropOff, (char)"you will never see this");
+		resprayed = true;
+	}
+
+	if (resprayed && mission_is_prepared) GRAPHICS::DRAW_MARKER(1, 1226.06, -3231.36, 4.9, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 5.0f, 5.0f, 1.0f, 204, 204, 0, 100, false, false, 2, false, false, false, false);
+
+	if (dropOffDistance < 0.7f && PED::IS_PED_IN_VEHICLE(playerPed, vehicle_to_steal_, 0) && resprayed && mission_is_prepared) {
+		VEHICLE::SET_VEHICLE_FORWARD_SPEED(vehicle_to_steal_, 0.0f);
+		while (ENTITY::GET_ENTITY_SPEED(vehicle_to_steal_) != 0) WAIT(0);
+		AI::TASK_LEAVE_VEHICLE(playerPed, vehicle_to_steal_, 0);
+		VEHICLE::SET_VEHICLE_UNDRIVEABLE(vehicle_to_steal_, 1);
+		CreateNotification("Vehicle collected.\nReward: ~g~$2000~w~", play_notification_beeps);
+		money_math();
+		UI::REMOVE_BLIP(&dropOff);
+		UI::REMOVE_BLIP(&vehicle_blip_);
+		ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&vehicle_to_steal_);
+		mission_is_prepared = false; player_acquired_vehicle_ = false; resprayed = false; blipMade = false; eventOver = false; missionTime = 0;
+	}
+
+	if (!VEHICLE::IS_VEHICLE_DRIVEABLE(vehicle_to_steal_, 1) && mission_is_prepared) {
+		CreateNotification("The ~y~special vehicle~w~ has been destroyed.", play_notification_beeps);
+		if (resprayed) UI::REMOVE_BLIP(&dropOff);
+		UI::REMOVE_BLIP(&vehicle_blip_);
+		ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&vehicle_to_steal_);
+		mission_is_prepared = false; player_acquired_vehicle_ = false; resprayed = false; blipMade = false; eventOver = false; missionTime = 0;
+	}
+
+	if (eventOver && vehicleDistance > collection_mission_minimum_range_for_timeout || mission_is_prepared && ENTITY::IS_ENTITY_DEAD(playerPed)) {
+		CreateNotification("The ~y~special vehicle~w~ is no longer requested.", play_notification_beeps);
+		if (resprayed) UI::REMOVE_BLIP(&dropOff);
+		UI::REMOVE_BLIP(&vehicle_blip_);
+		ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&vehicle_to_steal_);
+		mission_is_prepared = false; player_acquired_vehicle_ = false; resprayed = false; blipMade = false; eventOver = false; missionTime = 0;
+	}
+}
+
+class MissionHandler {
+public:
+	void Update();
+private:
+	MissionType current_mission_type_ = NO_Mission;
+	ULONGLONG ticks_since_last_mission_ = 0;
+	ULONGLONG tick_count_at_last_update_ = GetTickCount64();
+	ULONGLONG ticks_between_missions_ = mission_cooldown * 1000;
+	StealVehicleMission StealVehicleMission;
+	DestroyVehicleMission DestroyVehicleMission;
+	AssassinationMission AssassinationMission;
+	ArmoredTruckMission ArmoredTruckMission;
+	CrateDropMission CrateDropMission;
+};
+
+void MissionHandler::Update() {
+	
+	if (current_mission_type_ == NO_Mission) ticks_since_last_mission_ += (GetTickCount64() - tick_count_at_last_update_);
+	tick_count_at_last_update_ = GetTickCount64();
+
+	if (ticks_since_last_mission_ > ticks_between_missions_) {
+		current_mission_type_ = MissionType(rand() % MAX_Mission); // what a silly and convoluted method, but w.e
+		switch (current_mission_type_) {
+			case StealVehicle	:	current_mission_type_ = StealVehicleMission.Prepare();	break; // Prepare()s should return their MissionType on success.
+			case DestroyVehicle	:	current_mission_type_ = PrepareDestroyVehicleMission(); break; // If something goes wrong (StealVehicleMission takes too
+			case Assassination	:	current_mission_type_ = PrepareAssassinationMission();	break; // long to find a vehicle), they can return NO_Mission
+			case ArmoredTruck	:	current_mission_type_ = PrepareArmoredTruckMission();	break;
+			case CrateDrop		:	current_mission_type_ = PrepareCrateDropMission();		break;
+		}
+	}
+	
+	switch (current_mission_type_) {
+		case StealVehicle	:	current_mission_type_ = StealVehicleMission.Execute();		break; // if mission matches, the subroutine will execute.
+		case DestroyVehicle	:	current_mission_type_ = ExecuteDestroyVehicleMission();		break; // each Execute will be responsible for returning its
+		case Assassination	:	current_mission_type_ = ExecuteAssassinationMission();		break; // own type while active, and returning NONE
+		case ArmoredTruck	:	current_mission_type_ = ExecuteArmoredTruckMission();		break; // when finished
+		case CrateDrop		:	current_mission_type_ = ExecuteCrateDropMission();			break;
+	}
 }
 
 void Update() {
 	playerPed = PLAYER::PLAYER_PED_ID();
 	player = PLAYER::PLAYER_ID(); // need to be updated every cycle?
-	game_clock_minutes = int(TIME::GET_CLOCK_MINUTES());
+	//game_clock_minutes = int(TIME::GET_CLOCK_MINUTES());
 	GetParkedCarsFromWorld(playerPed, vehicle_spawn_points, maximum_number_of_spawn_points, vehicle_search_range_minimum);
 	GetVehicleModelsFromWorld(playerPed, possible_vehicle_models, maximum_number_of_vehicle_models, vehicle_search_range_minimum);
 }
@@ -1294,25 +1313,27 @@ void InitialWaitForGame(uint seconds) {
 }
 
 void GetSettingsFromIniFile() {
-	play_notification_beeps = reader.ReadInteger("Options", "BeepEnabled", 1);
-	mission_timeout = reader.ReadInteger("Options", "mission_end_delay_in_world_minutes", 210) / 2;
-	mission_cooldown = std::max((reader.ReadInteger("Options", "mission_start_delay_in_world_minutes", 150) / 2), 20);
-	blipStyle = reader.ReadInteger("Options", "BlipStyle", 0);
-	seconds_to_wait_for_vehicle_persistence_scripts = reader.ReadInteger("Options", "seconds_to_wait_for_vehicle_persistence_scripts", 20);
-	maximum_number_of_spawn_points = reader.ReadInteger("Options", "maximum_number_of_spawn_points", 10000);
-	maximum_number_of_vehicle_models = reader.ReadInteger("Options", "maximum_number_of_vehicle_models", 1000);
-	vehicle_search_range_minimum = reader.ReadInteger("Options", "vehicle_search_range_minimum", 50);
-	vehicle_spawn_point_minimum_range = reader.ReadInteger("Options", "vehicle_spawn_point_minimum_range", 666);
-	vehicle_spawn_point_maximum_range = reader.ReadInteger("Options", "vehicle_spawn_point_maximum_range", 1332);
-	collection_mission_minimum_range_for_timeout = reader.ReadInteger("Options", "collection_mission_minimum_range_for_timeout", 666);
-	notify_get_parked_cars_in_range = reader.ReadInteger("Debug", "notify_get_parked_cars_in_range", false);
-	notify_number_of_possible_vehicle_models = reader.ReadInteger("Debug", "notify_number_of_possible_vehicle_models", false);
-	notify_number_of_possible_spawn_points = reader.ReadInteger("Debug", "notify_number_of_possible_spawn_points", false);
-	notify_distance_to_spawn_point = reader.ReadInteger("Debug", "notify_distance_to_spawn_point", false);
-	notify_number_of_reserved_spawn_points = reader.ReadInteger("Debug", "notify_number_of_reserved_spawn_points", false);
+	// OPTIONS
+	play_notification_beeps = Reader.ReadInteger("Options", "play_notification_beeps", 1);
+	mission_timeout = Reader.ReadInteger("Options", "mission_timeout", 360);
+	mission_cooldown = std::max((Reader.ReadInteger("Options", "mission_cooldown", 30)), 30);
+	blip_style = Reader.ReadInteger("Options", "BlipStyle", 0);
+	maximum_number_of_spawn_points = Reader.ReadInteger("Options", "maximum_number_of_spawn_points", 10000);
+	maximum_number_of_vehicle_models = Reader.ReadInteger("Options", "maximum_number_of_vehicle_models", 1000);
+	vehicle_search_range_minimum = Reader.ReadInteger("Options", "vehicle_search_range_minimum", 50);
+	vehicle_spawn_point_minimum_range = Reader.ReadInteger("Options", "vehicle_spawn_point_minimum_range", 666);
+	vehicle_spawn_point_maximum_range = Reader.ReadInteger("Options", "vehicle_spawn_point_maximum_range", 1332);
+	collection_mission_minimum_range_for_timeout = Reader.ReadInteger("Options", "collection_mission_minimum_range_for_timeout", 666);
+	// DEBUG
+	seconds_to_wait_for_vehicle_persistence_scripts = Reader.ReadInteger("Debug", "seconds_to_wait_for_vehicle_persistence_scripts", 20);
+	number_of_tries_to_find_spawn_point = Reader.ReadInteger("Debug", "number_of_tries_to_find_spawn_point", 1000);
+	notify_get_parked_cars_in_range = Reader.ReadInteger("Debug", "notify_get_parked_cars_in_range", false);
+	notify_number_of_possible_vehicle_models = Reader.ReadInteger("Debug", "notify_number_of_possible_vehicle_models", false);
+	notify_number_of_possible_spawn_points = Reader.ReadInteger("Debug", "notify_number_of_possible_spawn_points", false);
+	notify_distance_to_spawn_point = Reader.ReadInteger("Debug", "notify_distance_to_spawn_point", false);
+	notify_number_of_reserved_spawn_points = Reader.ReadInteger("Debug", "notify_number_of_reserved_spawn_points", false);
+	
 }
-
-// SECOND ORDER
 
 void main() {
 	Logger.Write("main()");
@@ -1321,9 +1342,11 @@ void main() {
 	InitialWaitForGame(1); // ehh... I don't even know if any additional wait time is necessary...
 	UglyHackForVehiclePersistenceScripts(seconds_to_wait_for_vehicle_persistence_scripts); // UGLY HACK FOR VEHICLE PERSISTENCE!
 
+	MissionHandler Handler;
+
 	while (true) {
 		Update();
-		MissionHandler(1);
+		Handler.Update();
 		WAIT(0);
 	}
 
@@ -1334,5 +1357,3 @@ void ScriptMain() {
 	srand(GetTickCount());
 	main();
 }
-
-// FIRST ORDER
