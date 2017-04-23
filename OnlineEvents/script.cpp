@@ -21,7 +21,7 @@ CIniReader Reader(".\\OnlineEvents.ini");
 Log Logger(".\\OnlineEvents.log");
 
 
-typedef struct { float x; DWORD _paddingx; float y; DWORD _paddingy; float z; DWORD _paddingz; float h; DWORD _paddingw; } Vector4;
+typedef struct { float x = 0; DWORD _paddingx; float y = 0; DWORD _paddingy; float z = 0; DWORD _paddingz; float h = 0; DWORD _paddingw; } Vector4;
 
 #pragma warning(disable : 4244 4305) // double <-> float conversions
 #pragma warning(disable : 4302)
@@ -313,35 +313,29 @@ std::vector<Vector4> GetParkedCarsFromWorld(Ped ped, std::vector<Vector4> vector
 
 Vector4 SelectASpawnPoint(Ped pedestrian, std::vector<Vector4> vector_of_vector4s_to_search, std::vector<Vector4> vector_of_vector4s_to_exclude, uint max_range, uint min_range, uint max_tries) {
 	Logger.Write("SelectASpawnPoint()", LogNormal);
-	if (vector_of_vector4s_to_search.size() == 0) {
-		//Logger.Write("vector_of_vector4s_to_search.size() == 0", LogNormal);
-		throw 1;
-	}
-
 	Vector3 pedestrian_coordinates = ENTITY::GET_ENTITY_COORDS(pedestrian, 0);
-	Vector4 spawn_point;
-	uint tries = 0;
-	while (true) {
-		//Logger.Write("while (true), tries:" + std::to_string(tries), LogNormal);
-		spawn_point = vector_of_vector4s_to_search[(rand() % vector_of_vector4s_to_search.size())]; // pick a random possible point from our set
+	Vector4 empty_spawn_point;
+	if (vector_of_vector4s_to_search.size() == 0) {
+		Logger.Write("search vector was empty, returning an empty Vector4!", LogError);
+		return empty_spawn_point;
+	}
+	for (uint i = 0; i < max_tries; i++) {
+		Vector4 spawn_point = vector_of_vector4s_to_search[(rand() % vector_of_vector4s_to_search.size())]; // pick a random possible point from our set
 		float distance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(pedestrian_coordinates.x, pedestrian_coordinates.y, pedestrian_coordinates.z, spawn_point.x, spawn_point.y, spawn_point.z, 0);
 		if (distance > min_range && distance < max_range) {
-			//Logger.Write("passed distance test", LogNormal);
+			if (vector_of_vector4s_to_exclude.size() == 0) return spawn_point;
 			auto predicate = [spawn_point](const Vector4 & each_item) {
 				return (each_item.x == spawn_point.x && each_item.y == spawn_point.y && each_item.z == spawn_point.z && each_item.h == spawn_point.h);
 			};
-			bool found = (std::find_if(vector_of_vector4s_to_exclude.begin(), vector_of_vector4s_to_exclude.end(), predicate) != vector_of_vector4s_to_exclude.end()); // make sure this_vehicle_position does not already exist in vector_of_vector4s
-			if (!found) {
-				//Logger.Write("not in reserved array! throwing an exception now!", LogNormal);
+			bool found_in_exclude_vector = (std::find_if(vector_of_vector4s_to_exclude.begin(), vector_of_vector4s_to_exclude.end(), predicate) != vector_of_vector4s_to_exclude.end()); // make sure this_vehicle_position does not already exist in vector_of_vector4s
+			if (!found_in_exclude_vector) {
 				return spawn_point;
 			}
 		}
-		if (tries++ > max_tries) {
-			Logger.Write("exceeded max tries! throwing an exception now!", LogNormal);
-			throw 1;
-		}
 		WAIT(0);
 	}
+	Logger.Write("exceeded max tries, returning an empty Vector4!", LogError);
+	return empty_spawn_point;
 }
 
 class CrateDropMission {
@@ -362,17 +356,17 @@ MissionType CrateDropMission::Prepare() {
 	Logger.Write("CrateDropMission::Prepare()", LogNormal);
 	Vector3 player_coordinates = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
 	Vector3 spawn_location_1 = { -1782.33, DWORD(-826.29f), 7.83 };
-	
+
 	std::vector<Vector3> crate_spawn_locations = { 
-		Vector3 { DWORD(1067.85), DWORD(2362.45), DWORD(43.87) },
-		Vector3 { -3.77, DWORD(6840.14), DWORD(13.46) },
-		Vector3 { DWORD(2061.37), DWORD(2798.68), DWORD(50.29) },
-		Vector3 { DWORD(1883.24), DWORD(278.48), DWORD(162.73) },
-		Vector3 { -2912.36, DWORD(3077.48), DWORD(3.39) },
-		Vector3 { DWORD(2822.70), DWORD(-634.39), DWORD(2.15) },
-		Vector3 { DWORD(2184.12), DWORD(5026.09), DWORD(42.63) },
-		Vector3 { -3147.02, DWORD(305.27), DWORD(2.35) },
-		Vector3 { DWORD(1552.40), DWORD(6644.04), DWORD(2.55) }
+		Vector3 { (1067.85), (2362.45), (43.87) },
+		Vector3 { -3.77, (6840.14), (13.46) },
+		Vector3 { (2061.37), (2798.68), (50.29) },
+		Vector3 { (1883.24), (278.48), (162.73) },
+		Vector3 { -2912.36, (3077.48), (3.39) },
+		Vector3 { (2822.70), (-634.39), (2.15) },
+		Vector3 { (2184.12), (5026.09), (42.63) },
+		Vector3 { -3147.02, (305.27), (2.35) },
+		Vector3 { (1552.40), (6644.04), (2.55) }
 	}; // Someday I'll figure out something to expand this. Not today.
 	uint tries = 0;
 	while (true) {
@@ -521,40 +515,22 @@ private:
 	Vehicle armored_truck_ = NULL;
 	Ped truck_driver_ = NULL;
 	Blip truck_blip_ = NULL;
-	//Vector4 target_spawn_position_;
 };
 
 MissionType ArmoredTruckMission::Prepare() {
 	Logger.Write("ArmoredTruckMission::Prepare()", LogNormal);
-	Vector3 player_coordinates = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
-	Vector4 vehicle_spawn_point_to_use;
-	uint tries = 0;
-	while (true) {
-		vehicle_spawn_point_to_use = vehicle_spawn_points[(rand() % vehicle_spawn_points.size())]; // pick a random possible point from our set
-		float distance_between_player_and_spawn_point = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, vehicle_spawn_point_to_use.x, vehicle_spawn_point_to_use.y, vehicle_spawn_point_to_use.z, 0);
-		if (distance_between_player_and_spawn_point > spawn_point_min_search_range &&
-			distance_between_player_and_spawn_point < spawn_point_max_search_range) {
-			if (notify_distance_to_spawn_point) CreateNotification(&("Distance to Spawn: " + std::to_string(distance_between_player_and_spawn_point))[0u], play_notification_beeps); // combined into one line I hope it works...
-			break;
-		}
-		if (tries++ > number_of_tries_to_find_spawn_point) {
-			Logger.Write("failed to find a spawn point!", LogError);
-			//CreateNotification("failed to find a spawn point!", play_notification_beeps);
-			return NO_Mission;
-		}
-		WAIT(0);
-	}
-	
+	Vector4 vehicle_spawn_position = SelectASpawnPoint(playerPed, vehicle_spawn_points, reserved_vehicle_spawn_points, spawn_point_max_search_range, spawn_point_min_search_range, number_of_tries_to_find_spawn_point);
+	if (vehicle_spawn_position.x == 0.0f && vehicle_spawn_position.y == 0.0f && vehicle_spawn_position.z == 0.0f && vehicle_spawn_position.h == 0.0f) return NO_Mission;
 	STREAMING::REQUEST_MODEL(GAMEPLAY::GET_HASH_KEY("stockade"));
 	while (!STREAMING::HAS_MODEL_LOADED(GAMEPLAY::GET_HASH_KEY("stockade"))) WAIT(0);
-	armored_truck_ = VEHICLE::CREATE_VEHICLE(GAMEPLAY::GET_HASH_KEY("stockade"), vehicle_spawn_point_to_use.x, vehicle_spawn_point_to_use.y, vehicle_spawn_point_to_use.z, vehicle_spawn_point_to_use.h, 0, 0);
+	armored_truck_ = VEHICLE::CREATE_VEHICLE(GAMEPLAY::GET_HASH_KEY("stockade"), vehicle_spawn_position.x, vehicle_spawn_position.y, vehicle_spawn_position.z, vehicle_spawn_position.h, 0, 0);
 	VEHICLE::SET_VEHICLE_ON_GROUND_PROPERLY(armored_truck_);
 	STREAMING::REQUEST_MODEL(GAMEPLAY::GET_HASH_KEY("mp_s_m_armoured_01"));
 	truck_driver_ = PED::CREATE_PED_INSIDE_VEHICLE(armored_truck_, 26, GAMEPLAY::GET_HASH_KEY("mp_s_m_armoured_01"), -1, false, false);
 	if (ENTITY::DOES_ENTITY_EXIST(truck_driver_)) AI::TASK_VEHICLE_DRIVE_WANDER(truck_driver_, armored_truck_, 10.0f, 153);
 	truck_blip_ = UI::ADD_BLIP_FOR_ENTITY(armored_truck_);
-	if (use_default_blip == 0) UI::SET_BLIP_SPRITE(truck_blip_, 67);
-	else UI::SET_BLIP_SPRITE(truck_blip_, 1);
+	if (use_default_blip) UI::SET_BLIP_SPRITE(truck_blip_, 1);
+	else UI::SET_BLIP_SPRITE(truck_blip_, 67);
 	UI::SET_BLIP_COLOUR(truck_blip_, 3);
 	UI::SET_BLIP_DISPLAY(truck_blip_, (char)"you will never see this");
 	CreateNotification("An ~b~armored truck~w~ has been spotted carrying cash.", play_notification_beeps);
@@ -627,30 +603,15 @@ private:
 
 MissionType AssassinationMission::Prepare() {
 	Logger.Write("AssassinationMission::Prepare()", LogNormal);
-	Vector3 player_coordinates = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
-	Vector4 target_spawn_position_;
-	uint tries = 0;
-	while (true) {
-		target_spawn_position_ = vehicle_spawn_points[(rand() % vehicle_spawn_points.size())]; // pick a random possible point from our set
-		float distance_between_player_and_spawn_point = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, target_spawn_position_.x, target_spawn_position_.y, target_spawn_position_.z, 0);
-		if (distance_between_player_and_spawn_point > spawn_point_min_search_range &&
-			distance_between_player_and_spawn_point < spawn_point_max_search_range) {
-			//if (notify_distance_to_spawn_point) CreateNotification(&("Distance to Spawn: " + std::to_string(distance_between_player_and_spawn_point))[0u], play_notification_beeps); // combined into one line I hope it works...
-			break;
-		}
-		if (tries++ > number_of_tries_to_find_spawn_point) {
-			Logger.Write("failed to find a spawn point!", LogError);
-			return NO_Mission;
-		}
-		WAIT(0);
-	}
-	assassination_target_ = PED::CREATE_RANDOM_PED(target_spawn_position_.x, target_spawn_position_.y, target_spawn_position_.z);
+	Vector4 target_spawn_position = SelectASpawnPoint(playerPed, vehicle_spawn_points, reserved_vehicle_spawn_points, spawn_point_max_search_range, spawn_point_min_search_range, number_of_tries_to_find_spawn_point);
+	if (target_spawn_position.x == 0.0f && target_spawn_position.y == 0.0f && target_spawn_position.z == 0.0f && target_spawn_position.h == 0.0f) return NO_Mission;
+	assassination_target_ = PED::CREATE_RANDOM_PED(target_spawn_position.x, target_spawn_position.y, target_spawn_position.z);
 	while (!ENTITY::DOES_ENTITY_EXIST(assassination_target_)) WAIT(0);
-	PED::SET_PED_DESIRED_HEADING(assassination_target_, target_spawn_position_.h);
+	PED::SET_PED_DESIRED_HEADING(assassination_target_, target_spawn_position.h);
 	target_blip_ = UI::ADD_BLIP_FOR_ENTITY(assassination_target_);
 	AI::TASK_WANDER_STANDARD(assassination_target_, 1000.0f, 0);
-	if (use_default_blip == 0) UI::SET_BLIP_SPRITE(target_blip_, 432);
-	else UI::SET_BLIP_SPRITE(target_blip_, 1);
+	if (use_default_blip) UI::SET_BLIP_SPRITE(target_blip_, 1);
+	else UI::SET_BLIP_SPRITE(target_blip_, 432);
 	UI::SET_BLIP_COLOUR(target_blip_, 1);
 	UI::SET_BLIP_DISPLAY(target_blip_, (char)"you will never see this");
 	CreateNotification("A hit has been placed on a ~r~target~w~.  Kill them for a reward.", play_notification_beeps);
@@ -695,28 +656,20 @@ private:
 
 MissionType DestroyVehicleMission::Prepare() {
 	Logger.Write("DestroyVehicleMission::Prepare()", LogNormal);
-	//Logger.Write("Reserved Spawn Points: " + std::to_string(reserved_vehicle_spawn_points_parked.size())[0u], LogVerbose); // this might be causing some sort of addressing problem?
-	Vector3 player_coordinates = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
-	Vector4 vehicle_spawn_point_to_use;
-	try {
-		vehicle_spawn_point_to_use = SelectASpawnPoint(playerPed, vehicle_spawn_points, reserved_vehicle_spawn_points, spawn_point_max_search_range, spawn_point_min_search_range, number_of_tries_to_find_spawn_point);
-	} catch (int) {
-		Logger.Write("SelectASpawnPoint() threw an exception! It probably couldn't find a spawn point...", LogNormal);
-		return NO_Mission;
-	}
+	Vector4 vehicle_spawn_position = SelectASpawnPoint(playerPed, vehicle_spawn_points, reserved_vehicle_spawn_points, spawn_point_max_search_range, spawn_point_min_search_range, number_of_tries_to_find_spawn_point);
+	if (vehicle_spawn_position.x == 0.0f && vehicle_spawn_position.y == 0.0f && vehicle_spawn_position.z == 0.0f && vehicle_spawn_position.h == 0.0f) return NO_Mission;
 	std::vector<char *> vehicle_names = { "rebel", "rancherxl", "dloader", "voodoo2", "bfinjection", 
 												"sanchez2", "hexer", "daemon", "journey", "sadler" };
-	Hash vehicle_model_to_use = GAMEPLAY::GET_HASH_KEY(vehicle_names[rand() % vehicle_names.size()]);
+	Hash vehicle_model = GAMEPLAY::GET_HASH_KEY(vehicle_names[rand() % vehicle_names.size()]);
 	//Hash vehicle_model_to_use = possible_vehicle_models[(rand() % possible_vehicle_models.size())];
-	STREAMING::REQUEST_MODEL(vehicle_model_to_use);
-	while (!STREAMING::HAS_MODEL_LOADED(vehicle_model_to_use)) WAIT(0);
-	vehicle_to_destroy_ = VEHICLE::CREATE_VEHICLE(vehicle_model_to_use, vehicle_spawn_point_to_use.x, vehicle_spawn_point_to_use.y, vehicle_spawn_point_to_use.z, vehicle_spawn_point_to_use.h, 0, 0);
+	STREAMING::REQUEST_MODEL(vehicle_model);
+	while (!STREAMING::HAS_MODEL_LOADED(vehicle_model)) WAIT(0);
+	vehicle_to_destroy_ = VEHICLE::CREATE_VEHICLE(vehicle_model, vehicle_spawn_position.x, vehicle_spawn_position.y, vehicle_spawn_position.z, vehicle_spawn_position.h, 0, 0);
 	VEHICLE::SET_VEHICLE_ON_GROUND_PROPERLY(vehicle_to_destroy_);
 	vehicle_blip_ = UI::ADD_BLIP_FOR_ENTITY(vehicle_to_destroy_);
-	if (use_default_blip == 0) {
-		if (VEHICLE::IS_THIS_MODEL_A_CAR(vehicle_to_destroy_)) UI::SET_BLIP_SPRITE(vehicle_blip_, 225);
-		else UI::SET_BLIP_SPRITE(vehicle_blip_, 226);
-	} else UI::SET_BLIP_SPRITE(vehicle_blip_, 1);
+	if (use_default_blip) UI::SET_BLIP_SPRITE(vehicle_blip_, 1);
+	else if (VEHICLE::IS_THIS_MODEL_A_CAR(vehicle_model)) UI::SET_BLIP_SPRITE(vehicle_blip_, 225);
+	else UI::SET_BLIP_SPRITE(vehicle_blip_, 226);
 	UI::SET_BLIP_COLOUR(vehicle_blip_, 1);
 	UI::SET_BLIP_DISPLAY(vehicle_blip_, (char)"you will never see this");
 	CreateNotification("A ~r~smuggler vehicle~w~ has been spotted.  Destroy it for a reward.", play_notification_beeps);
@@ -756,7 +709,7 @@ public:
 	MissionType Timeout();
 private:
 	Vehicle vehicle_to_steal_ = NULL;
-	Vector3 drop_off_coordinates = { DWORD(1226.06), DWORD(-3231.36), DWORD(6.02) };
+	Vector3 drop_off_coordinates = { static_cast<DWORD>(1226.06), static_cast<DWORD>(-3231.36), static_cast<DWORD>(6.02) };
 	Blip vehicle_blip_ = NULL;
 	Blip drop_off_blip_ = NULL;
 	int vehicle_primary_color_initial_, vehicle_secondary_color_initial_;
@@ -767,39 +720,20 @@ private:
 
 MissionType StealVehicleMission::Prepare() {
 	Logger.Write("StealVehicleMission.Prepare()", LogNormal);
-	Vector3 player_coordinates = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
-	Vector4 vehicle_spawn_point_to_use;
-	uint tries = 0;
-	while (true) {
-		vehicle_spawn_point_to_use = vehicle_spawn_points[(rand() % vehicle_spawn_points.size())]; // pick a random possible point from our set
-		float distance_between_player_and_spawn_point = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, vehicle_spawn_point_to_use.x, vehicle_spawn_point_to_use.y, vehicle_spawn_point_to_use.z, 0);
-		if (distance_between_player_and_spawn_point > spawn_point_min_search_range &&
-			distance_between_player_and_spawn_point < spawn_point_max_search_range) {
-			break;
-		}
-		if (tries++ > number_of_tries_to_find_spawn_point) {
-			Logger.Write("failed to find a spawn point!", LogError);
-			//CreateNotification("failed to find a spawn point!", play_notification_beeps);
-			return NO_Mission;
-		}
-		WAIT(0);
-	}
-	Hash vehicle_model_to_use = possible_vehicle_models[(rand() % possible_vehicle_models.size())]; // pick a random model from our set, pray that it's still loaded in memory?
-	STREAMING::REQUEST_MODEL(vehicle_model_to_use);
-	while (!STREAMING::HAS_MODEL_LOADED(vehicle_model_to_use)) WAIT(0);
-	vehicle_to_steal_ = VEHICLE::CREATE_VEHICLE(vehicle_model_to_use, vehicle_spawn_point_to_use.x, vehicle_spawn_point_to_use.y, vehicle_spawn_point_to_use.z, vehicle_spawn_point_to_use.h, 0, 0);
+	Vector4 vehicle_spawn_position = SelectASpawnPoint(playerPed, vehicle_spawn_points, reserved_vehicle_spawn_points, spawn_point_max_search_range, spawn_point_min_search_range, number_of_tries_to_find_spawn_point);
+	if (vehicle_spawn_position.x == 0.0f && vehicle_spawn_position.y == 0.0f && vehicle_spawn_position.z == 0.0f && vehicle_spawn_position.h == 0.0f) return NO_Mission;
+	Hash vehicle_model = possible_vehicle_models[(rand() % possible_vehicle_models.size())]; // pick a random model from our set, pray that it's still loaded in memory?
+	STREAMING::REQUEST_MODEL(vehicle_model); // oh wait no, we can just load it.
+	while (!STREAMING::HAS_MODEL_LOADED(vehicle_model)) WAIT(0);
+	vehicle_to_steal_ = VEHICLE::CREATE_VEHICLE(vehicle_model, vehicle_spawn_position.x, vehicle_spawn_position.y, vehicle_spawn_position.z, vehicle_spawn_position.h, 0, 0);
 	VEHICLE::SET_VEHICLE_ON_GROUND_PROPERLY(vehicle_to_steal_);
 	vehicle_blip_ = UI::ADD_BLIP_FOR_ENTITY(vehicle_to_steal_);
-	if (use_default_blip == 0) {
-		if (VEHICLE::IS_THIS_MODEL_A_CAR(GetHashOfVehicleModel(vehicle_to_steal_))) UI::SET_BLIP_SPRITE(vehicle_blip_, 225);
-		else UI::SET_BLIP_SPRITE(vehicle_blip_, 226);
-	}
-	else UI::SET_BLIP_SPRITE(vehicle_blip_, 1);
+	if (use_default_blip) UI::SET_BLIP_SPRITE(vehicle_blip_, 1);
+	else if (VEHICLE::IS_THIS_MODEL_A_CAR(vehicle_model)) UI::SET_BLIP_SPRITE(vehicle_blip_, 225);
+	else UI::SET_BLIP_SPRITE(vehicle_blip_, 226);
 	UI::SET_BLIP_COLOUR(vehicle_blip_, 5);
 	UI::SET_BLIP_DISPLAY(vehicle_blip_, (char)"you will never see this");
-
 	VEHICLE::GET_VEHICLE_COLOURS(vehicle_to_steal_, &vehicle_primary_color_initial_, &vehicle_secondary_color_initial_);
-
 	CreateNotification("A ~y~special vehicle~w~ has been requested for pickup.", play_notification_beeps);
 	return StealVehicle;
 }
@@ -986,11 +920,10 @@ void GetSettingsFromIniFile() {
 
 void main() {
 	Logger.Write("main()", LogNormal);
-	
+
 	GetSettingsFromIniFile();
 	InitialWaitForGame(1); // ehh... I don't even know if any additional wait time is necessary...
 	UglyHackForVehiclePersistenceScripts(seconds_to_wait_for_vehicle_persistence_scripts); // UGLY HACK FOR VEHICLE PERSISTENCE!
-
 	MissionHandler Handler;
 
 	while (true) {
