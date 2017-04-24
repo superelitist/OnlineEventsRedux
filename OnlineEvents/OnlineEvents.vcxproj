@@ -26,6 +26,7 @@
     <ClInclude Include="..\..\inc\types.h" />
     <ClInclude Include="Log.h" />
     <ClInclude Include="script.h" />
+    <ClInclude Include="strings.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{8D82F34A-1D64-465B-84B1-37F89AD3D20B}</ProjectGuid>

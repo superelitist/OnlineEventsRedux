@@ -30,6 +30,9 @@
     <ClInclude Include="Log.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="strings.h">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="include">

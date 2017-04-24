@@ -5,11 +5,12 @@
 #include <fstream>
 #include <Windows.h>
 
-enum LogLevel { LogNone, LogError, LogNormal, LogVerbose };
+enum LogLevel { LogNone, LogError, LogNormal, LogVerbose, LogVeryVerbose };
 
 class Log {
 public:
-	Log(std::string filename);
+	Log(std::string filename, LogLevel logging_level);
+	void SetLoggingLevel(LogLevel logging_level);
 	void Write(std::string string, LogLevel level);
 	void Close();
 private:

@@ -12,13 +12,15 @@
 #include <string>
 #include <ctime>
 #include "iostream"
-#include <sstream>
+//#include <sstream>
 #include <algorithm>
 #include "Log.h"
+#include "strings.h"
+
 //#include "keyboard.h"
 
 CIniReader Reader(".\\OnlineEvents.ini");
-Log Logger(".\\OnlineEvents.log");
+Log Logger(".\\OnlineEvents.log", LogNormal);
 
 
 typedef struct { float x = 0; DWORD _paddingx; float y = 0; DWORD _paddingy; float z = 0; DWORD _paddingz; float h = 0; DWORD _paddingw; } Vector4;
@@ -77,6 +79,36 @@ int val;
 
 enum MissionType { StealVehicle, DestroyVehicle, Assassination, ArmoredTruck, CrateDrop, MAX_Mission, NO_Mission };
 enum WantedLevel { Wanted_Zero, Wanted_One, Wanted_Two, Wanted_Three, Wanted_Four, Wanted_Five };
+enum VehiclesToSelect {
+	SelectCompacts = 0x000001,
+	SelectSedans = 0x000002,
+	SelectSUVs = 0x000004,
+	SelectCoupes = 0x000008,
+	SelectMuscle = 0x000010,
+	SelectSportsClassics = 0x000020,
+	SelectSports = 0x000040,
+	SelectSuper = 0x000080,
+	SelectMotorcycles = 0x000100,
+	SelectOffRoad = 0x000200,
+	SelectIndustrial = 0x000400,
+	SelectUtility = 0x000800,
+	SelectVans = 0x001000,
+	SelectCycles = 0x002000,
+	SelectBoats = 0x004000,
+	SelectHelicopters = 0x008000,
+	SelectPlanes = 0x010000,
+	SelectService = 0x020000,
+	SelectEmergency = 0x040000,
+	SelectMilitary = 0x080000,
+	SelectCommercial = 0x100000,
+	SelectTrains = 0x200000,
+};
+
+// technically this could be added to the ini file pretty easily, but not by name - I'd have to include instructions...
+int vehicle_classes_that_can_be_selected = 
+SelectCompacts | SelectSedans | SelectSUVs | SelectCoupes |
+SelectMuscle | SelectSportsClassics | SelectSports | SelectSuper |
+SelectMotorcycles | SelectOffRoad;
 
 Ped playerPed; // breaks naming convention because 
 Player player;
@@ -84,16 +116,16 @@ std::vector<Vector4> reserved_vehicle_spawn_points;
 std::vector<Vector4> vehicle_spawn_points;
 std::vector<Hash> possible_vehicle_models;
 
-
+// preference options
 bool play_notification_beeps, use_default_blip;
-ULONGLONG mission_cooldown;
-uint mission_timeout;
-uint maximum_number_of_spawn_points, maximum_number_of_vehicle_models, vehicle_search_range_minimum;
-uint spawn_point_min_search_range, spawn_point_max_search_range;
-uint mission_minimum_range_for_timeout, logging_level;
-bool notify_get_parked_cars_in_range;
-bool notify_number_of_possible_vehicle_models, notify_number_of_possible_spawn_points, notify_distance_to_spawn_point, notify_number_of_reserved_spawn_points;
-uint seconds_to_wait_for_vehicle_persistence_scripts, number_of_tries_to_find_spawn_point;
+uint mission_cooldown, mission_timeout;
+uint spawn_point_minimum_range, spawn_point_maximum_range;
+uint mission_minimum_range_for_timeout;
+
+// debug options
+LogLevel logging_level;
+uint seconds_to_wait_for_vehicle_persistence_scripts, number_of_tries_to_select_items, vehicle_search_range_minimum;
+uint maximum_number_of_spawn_points, maximum_number_of_vehicle_models;
 
 void NotifyBottomCenter(char* message) {
 	UI::BEGIN_TEXT_COMMAND_PRINT("STRING");
@@ -194,6 +226,35 @@ Hash GetHashOfVehicleModel(Vehicle vehicle) {
 	return ENTITY::GET_ENTITY_MODEL(vehicle);
 }
 
+int GetVehicleClassFromHash(Hash hash) {
+	int raw_int = VEHICLE::GET_VEHICLE_CLASS_FROM_NAME(hash);
+	switch (raw_int) {
+	case  0: return SelectCompacts;
+	case  1: return SelectSedans;
+	case  2: return SelectSUVs;
+	case  3: return SelectCoupes;
+	case  4: return SelectMuscle;
+	case  5: return SelectSportsClassics;
+	case  6: return SelectSports;
+	case  7: return SelectSuper;
+	case  8: return SelectMotorcycles;
+	case  9: return SelectOffRoad;
+	case 10: return SelectIndustrial;
+	case 11: return SelectUtility;
+	case 12: return SelectVans;
+	case 13: return SelectCycles;
+	case 14: return SelectBoats;
+	case 15: return SelectHelicopters;
+	case 16: return SelectPlanes;
+	case 17: return SelectService;
+	case 18: return SelectEmergency;
+	case 19: return SelectMilitary;
+	case 20: return SelectCommercial;
+	case 21: return SelectTrains;
+	}
+	return 0;
+}
+
 void SetPlayerMinimumWantedLevel(WantedLevel wanted_level) {
 	Logger.Write("SetPlayerMinimumWantedLevel()", LogVerbose);
 	if (PLAYER::GET_PLAYER_WANTED_LEVEL(player) < wanted_level) {
@@ -233,8 +294,8 @@ bool DoesEntityExistAndIsNotNull(Entity entity) {
 	return (entity != NULL && ENTITY::DOES_ENTITY_EXIST(entity));
 }
 
-std::vector<Hash> GetVehicleModelsFromWorld(Ped ped, std::vector<Hash> vector_of_hashes, int maximum_vector_size, int search_range_minimum) {
-	//Logger.Write("GetVehicleModelsFromWorld()", LogVerbose);
+std::vector<Hash> GetVehicleModelsFromWorld(Ped ped, std::vector<Hash> vector_of_hashes, int maximum_vector_size) {
+	Logger.Write("GetVehicleModelsFromWorld()", LogVeryVerbose);
 	const int ARR_SIZE = 1024;
 	Vehicle all_world_vehicles[ARR_SIZE];
 	int count = worldGetAllVehicles(all_world_vehicles, ARR_SIZE);
@@ -245,30 +306,34 @@ std::vector<Hash> GetVehicleModelsFromWorld(Ped ped, std::vector<Hash> vector_of
 			if (DoesEntityExistAndIsNotNull(all_world_vehicles[i])) {
 				Vehicle this_vehicle = all_world_vehicles[i];
 				Vector3 this_vehicle_coordinates = ENTITY::GET_ENTITY_COORDS(this_vehicle, 0);
-				if (DoesEntityExistAndIsNotNull(this_vehicle) &&
-					IsVehicleDrivable(this_vehicle) && // is the vehicle a car/bike/etc and can the player start driving it?
-					IsVehicleProbablyParked(this_vehicle) && // not moving, no driver?
-					!(VEHICLE::GET_LAST_PED_IN_VEHICLE_SEAT(this_vehicle, -1)) && // probably not previously used by the player? We can hope?
-					!(VEHICLE::_IS_VEHICLE_DAMAGED(this_vehicle)) && // probably not an empty car in the street as a result of a pileup...
-					(VEHICLE::_IS_VEHICLE_SHOP_RESPRAY_ALLOWED(this_vehicle)) && // hopefully this actually works so airport luggage trains don't get tagged...
-					GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, this_vehicle_coordinates.x, this_vehicle_coordinates.y, this_vehicle_coordinates.z, 0) > search_range_minimum
-					) {
-					Hash this_vehicle_model = GetHashOfVehicleModel(this_vehicle);
-					auto predicate = [this_vehicle_model](const Hash & item) { // pretty sure this isn't necessary for hashes, but it works.
-						return (item == this_vehicle_model);
+				char *this_vehicle_display_name = VEHICLE::GET_DISPLAY_NAME_FROM_VEHICLE_MODEL(this_vehicle);
+				char *this_vehicle_string_literal = UI::_GET_LABEL_TEXT(this_vehicle_display_name);
+				if (DoesEntityExistAndIsNotNull(this_vehicle)) {
+					Hash this_vehicle_hash = GetHashOfVehicleModel(this_vehicle);
+					auto predicate = [this_vehicle_hash](const Hash & item) { // pretty sure this isn't necessary for hashes, but it works.
+						return (item == this_vehicle_hash);
 					};
 					bool found = (std::find_if(vector_of_hashes.begin(), vector_of_hashes.end(), predicate) != vector_of_hashes.end());
-					if (!found) vector_of_hashes.push_back(this_vehicle_model);
+					if (!found) {
+						char *this_vehicle_display_name = VEHICLE::GET_DISPLAY_NAME_FROM_VEHICLE_MODEL(this_vehicle_hash);
+						char *this_vehicle_string_literal = UI::_GET_LABEL_TEXT(this_vehicle_display_name);
+						int vehicle_class = VEHICLE::GET_VEHICLE_CLASS_FROM_NAME(this_vehicle_hash);
+						if (!VEHICLE::_IS_VEHICLE_SHOP_RESPRAY_ALLOWED(this_vehicle)) {
+							//Logger.Write("GetVehicleModelsFromWorld(): !VEHICLE::_IS_VEHICLE_SHOP_RESPRAY_ALLOWED(): " + std::string(this_vehicle_string_literal), LogVerbose);
+							//Logger.Write("GetVehicleModelsFromWorld(): !VEHICLE::_IS_VEHICLE_SHOP_RESPRAY_ALLOWED(): " + std::to_string(vehicle_class), LogVerbose);
+						}
+						vector_of_hashes.push_back(this_vehicle_hash);
+					}
 					if (vector_of_hashes.size() > maximum_vector_size) vector_of_hashes.erase(vector_of_hashes.begin()); // also pretty sure there's not more than a thousand models in the game, but safety first...
-				}
+				}	
 			}
 		}
 	}
 	return vector_of_hashes;
 }
 
-std::vector<Vector4> GetParkedCarsFromWorld(Ped ped, std::vector<Vector4> vector_of_vector4s, int maximum_vector_size, int search_range_minimum) {
-	//Logger.Write("GetParkedCarsFromWorld()", LogVerbose);
+std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vector4> vector_of_vector4s, int maximum_vector_size, int search_range_minimum) {
+	Logger.Write("GetParkedCarsFromWorld()", LogVeryVerbose);
 	const int ARR_SIZE = 1024;
 	Vehicle all_world_vehicles[ARR_SIZE];
 	int count = worldGetAllVehicles(all_world_vehicles, ARR_SIZE);
@@ -334,8 +399,28 @@ Vector4 SelectASpawnPoint(Ped pedestrian, std::vector<Vector4> vector_of_vector4
 		}
 		WAIT(0);
 	}
-	Logger.Write("exceeded max tries, returning an empty Vector4!", LogError);
+	Logger.Write("SelectASpawnPoint() exceeded max_tries, returning an empty Vector4!", LogError);
 	return empty_spawn_point;
+}
+
+Hash SelectAVehicleModel(std::vector<Hash> vector_of_hashes_to_search, uint vehicle_class_options, uint max_tries) {
+	Logger.Write("SelectAVehicleModel()", LogNormal);
+	Hash empty_hash;
+	if (vector_of_hashes_to_search.size() == 0) {
+		Logger.Write("SelectAVehicleModel() vector_of_hashes_to_search was empty, returning an empty hash!", LogError);
+		return empty_hash;
+	}
+	for (uint i = 0; i < max_tries; i++) {
+		Hash vehicle_hash = vector_of_hashes_to_search[(rand() % vector_of_hashes_to_search.size())]; // pick a random model from our set...
+		char *this_vehicle_display_name = VEHICLE::GET_DISPLAY_NAME_FROM_VEHICLE_MODEL(vehicle_hash);
+		char *this_vehicle_string_literal = UI::_GET_LABEL_TEXT(this_vehicle_display_name);
+		Logger.Write("SelectAVehicleModel(): VEHICLE::GET_DISPLAY_NAME_FROM_VEHICLE_MODEL(vehicle_hash): " + std::string(this_vehicle_string_literal), LogVerbose);
+		int vehicle_class = GetVehicleClassFromHash(vehicle_hash);
+		Logger.Write("SelectAVehicleModel(): VEHICLE::GET_VEHICLE_CLASS(vehicle_model): " + std::string(VehicleClasses[vehicle_class]), LogVerbose); // from strings.h because c++ sucks at some things.
+		if (vehicle_class_options & vehicle_class) return vehicle_hash;
+	}
+	Logger.Write("SelectAVehicleModel() exceeded max_tries, returning an empty hash!", LogError);
+	return empty_hash;
 }
 
 class CrateDropMission {
@@ -345,7 +430,7 @@ public:
 	MissionType Timeout();
 private:
 	Blip crate_blip_ = NULL;
-	Vector3 crate_spawn_location_;
+	Vector4 crate_spawn_location_;
 	bool crate_is_special_ = false;
 	bool objects_were_spawned_ = false;
 	Object crate_;
@@ -355,38 +440,25 @@ private:
 MissionType CrateDropMission::Prepare() {
 	Logger.Write("CrateDropMission::Prepare()", LogNormal);
 	Vector3 player_coordinates = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
-	Vector3 spawn_location_1 = { -1782.33, DWORD(-826.29f), 7.83 };
-
-	std::vector<Vector3> crate_spawn_locations = { 
-		Vector3 { (1067.85), (2362.45), (43.87) },
-		Vector3 { -3.77, (6840.14), (13.46) },
-		Vector3 { (2061.37), (2798.68), (50.29) },
-		Vector3 { (1883.24), (278.48), (162.73) },
-		Vector3 { -2912.36, (3077.48), (3.39) },
-		Vector3 { (2822.70), (-634.39), (2.15) },
-		Vector3 { (2184.12), (5026.09), (42.63) },
-		Vector3 { -3147.02, (305.27), (2.35) },
-		Vector3 { (1552.40), (6644.04), (2.55) }
-	}; // Someday I'll figure out something to expand this. Not today.
-	uint tries = 0;
-	while (true) {
-		crate_spawn_location_ = crate_spawn_locations[(rand() % crate_spawn_locations.size())]; // pick a random possible point from our set
-		float distance_between_player_and_spawn_point = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, crate_spawn_location_.x, crate_spawn_location_.y, crate_spawn_location_.z, 0);
-		if (distance_between_player_and_spawn_point > spawn_point_min_search_range &&
-			distance_between_player_and_spawn_point < spawn_point_max_search_range) {
-			if (notify_distance_to_spawn_point) CreateNotification(&("Distance to Spawn: " + std::to_string(distance_between_player_and_spawn_point))[0u], play_notification_beeps); // combined into one line I hope it works...
-			break;
-		}
-		if (tries++ > number_of_tries_to_find_spawn_point) {
-			Logger.Write("failed to find a spawn point!", LogError);
-			return NO_Mission;
-		}
-		WAIT(0);
-	}
+	std::vector<Vector4> crate_spawn_locations;
+	Vector4 v1; v1.x = -1782.33f; v1.y = -826.29f; v1.z = 7.83f; crate_spawn_locations.push_back(v1);
+	Vector4 v2; v2.x = 1067.85; v2.y = 2362.45; v2.z = 43.87; crate_spawn_locations.push_back(v2);
+	Vector4 v3; v3.x = -3.77; v3.y = 6840.14; v3.z = 13.46; crate_spawn_locations.push_back(v3);
+	Vector4 v4; v4.x = 2061.37; v4.y = 2798.68; v4.z = 50.29; crate_spawn_locations.push_back(v4);
+	Vector4 v5; v5.x = 1883.24; v5.y = 278.48; v5.z = 162.73; crate_spawn_locations.push_back(v5);
+	Vector4 v6; v6.x = -2912.36; v6.y = 3077.48; v6.z = 3.39; crate_spawn_locations.push_back(v6);
+	Vector4 v7; v7.x = 2822.70; v7.y = -634.39; v7.z = 2.15; crate_spawn_locations.push_back(v7);
+	Vector4 v8; v8.x = 2184.12; v8.y = 5026.099; v8.z = 42.63; crate_spawn_locations.push_back(v8);
+	Vector4 v9; v9.x = -3147.02; v9.y = 305.27; v9.z = 2.35; crate_spawn_locations.push_back(v9);
+	Vector4 v10; v10.x = 1552.40; v10.y = 6644.04; v10.z = 2.55; crate_spawn_locations.push_back(v10);
+	// Someday I'll figure out something to expand this. Not today.
+	std::vector<Vector4> empty_vector;
+	crate_spawn_location_ = SelectASpawnPoint(playerPed, crate_spawn_locations, empty_vector, spawn_point_maximum_range, spawn_point_minimum_range, number_of_tries_to_select_items);
+	if (crate_spawn_location_.x == 0.0f && crate_spawn_location_.y == 0.0f && crate_spawn_location_.z == 0.0f && crate_spawn_location_.h == 0.0f) return NO_Mission;
 	if (rand() % 20 == 20) crate_is_special_ = true;
 	crate_blip_ = UI::ADD_BLIP_FOR_COORD(crate_spawn_location_.x, crate_spawn_location_.y, crate_spawn_location_.z);
-	if (use_default_blip) UI::SET_BLIP_SPRITE(crate_blip_, 306);
-	else UI::SET_BLIP_SPRITE(crate_blip_, 1);
+	if (use_default_blip) UI::SET_BLIP_SPRITE(crate_blip_, 1); 
+	else UI::SET_BLIP_SPRITE(crate_blip_, 306); 
 	UI::SET_BLIP_SCALE(crate_blip_, 1.5);
 	if (crate_is_special_) UI::SET_BLIP_COLOUR(crate_blip_, 5);
 	else UI::SET_BLIP_COLOUR(crate_blip_, 2);
@@ -402,6 +474,7 @@ MissionType CrateDropMission::Execute() {
 	int distance_to_crate = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, crate_spawn_location_.x, crate_spawn_location_.y, crate_spawn_location_.z, 0);
 
 	if (distance_to_crate < 300 && !objects_were_spawned_) {
+		Logger.Write("attempting to spawn objects", LogVerbose);
 		STREAMING::REQUEST_MODEL(GAMEPLAY::GET_HASH_KEY("prop_box_ammo04a"));
 		while (!STREAMING::HAS_MODEL_LOADED(GAMEPLAY::GET_HASH_KEY("prop_box_ammo04a"))) WAIT(0);
 		crate_ = OBJECT::CREATE_AMBIENT_PICKUP(0x14568F28, crate_spawn_location_.x, crate_spawn_location_.y, crate_spawn_location_.z, -1, 0, GAMEPLAY::GET_HASH_KEY("prop_box_ammo04a"), 1, 1);
@@ -410,8 +483,8 @@ MissionType CrateDropMission::Execute() {
 		ENTITY::FREEZE_ENTITY_POSITION(crate_, 1);
 		UI::REMOVE_BLIP(&crate_blip_);
 		crate_blip_ = UI::ADD_BLIP_FOR_ENTITY(crate_);
-		if (use_default_blip) UI::SET_BLIP_SPRITE(crate_blip_, 306);
-		else UI::SET_BLIP_SPRITE(crate_blip_, 1);
+		if (use_default_blip) UI::SET_BLIP_SPRITE(crate_blip_, 1);
+		else UI::SET_BLIP_SPRITE(crate_blip_, 306);
 		UI::SET_BLIP_SCALE(crate_blip_, 1.5);
 		if (crate_is_special_) UI::SET_BLIP_COLOUR(crate_blip_, 5);
 		else UI::SET_BLIP_COLOUR(crate_blip_, 2);
@@ -519,13 +592,14 @@ private:
 
 MissionType ArmoredTruckMission::Prepare() {
 	Logger.Write("ArmoredTruckMission::Prepare()", LogNormal);
-	Vector4 vehicle_spawn_position = SelectASpawnPoint(playerPed, vehicle_spawn_points, reserved_vehicle_spawn_points, spawn_point_max_search_range, spawn_point_min_search_range, number_of_tries_to_find_spawn_point);
+	Vector4 vehicle_spawn_position = SelectASpawnPoint(playerPed, vehicle_spawn_points, reserved_vehicle_spawn_points, spawn_point_maximum_range, spawn_point_minimum_range, number_of_tries_to_select_items);
 	if (vehicle_spawn_position.x == 0.0f && vehicle_spawn_position.y == 0.0f && vehicle_spawn_position.z == 0.0f && vehicle_spawn_position.h == 0.0f) return NO_Mission;
 	STREAMING::REQUEST_MODEL(GAMEPLAY::GET_HASH_KEY("stockade"));
 	while (!STREAMING::HAS_MODEL_LOADED(GAMEPLAY::GET_HASH_KEY("stockade"))) WAIT(0);
 	armored_truck_ = VEHICLE::CREATE_VEHICLE(GAMEPLAY::GET_HASH_KEY("stockade"), vehicle_spawn_position.x, vehicle_spawn_position.y, vehicle_spawn_position.z, vehicle_spawn_position.h, 0, 0);
 	VEHICLE::SET_VEHICLE_ON_GROUND_PROPERLY(armored_truck_);
 	STREAMING::REQUEST_MODEL(GAMEPLAY::GET_HASH_KEY("mp_s_m_armoured_01"));
+	while (!STREAMING::HAS_MODEL_LOADED(GAMEPLAY::GET_HASH_KEY("mp_s_m_armoured_01"))) WAIT(0);
 	truck_driver_ = PED::CREATE_PED_INSIDE_VEHICLE(armored_truck_, 26, GAMEPLAY::GET_HASH_KEY("mp_s_m_armoured_01"), -1, false, false);
 	if (ENTITY::DOES_ENTITY_EXIST(truck_driver_)) AI::TASK_VEHICLE_DRIVE_WANDER(truck_driver_, armored_truck_, 10.0f, 153);
 	truck_blip_ = UI::ADD_BLIP_FOR_ENTITY(armored_truck_);
@@ -603,7 +677,7 @@ private:
 
 MissionType AssassinationMission::Prepare() {
 	Logger.Write("AssassinationMission::Prepare()", LogNormal);
-	Vector4 target_spawn_position = SelectASpawnPoint(playerPed, vehicle_spawn_points, reserved_vehicle_spawn_points, spawn_point_max_search_range, spawn_point_min_search_range, number_of_tries_to_find_spawn_point);
+	Vector4 target_spawn_position = SelectASpawnPoint(playerPed, vehicle_spawn_points, reserved_vehicle_spawn_points, spawn_point_maximum_range, spawn_point_minimum_range, number_of_tries_to_select_items);
 	if (target_spawn_position.x == 0.0f && target_spawn_position.y == 0.0f && target_spawn_position.z == 0.0f && target_spawn_position.h == 0.0f) return NO_Mission;
 	assassination_target_ = PED::CREATE_RANDOM_PED(target_spawn_position.x, target_spawn_position.y, target_spawn_position.z);
 	while (!ENTITY::DOES_ENTITY_EXIST(assassination_target_)) WAIT(0);
@@ -656,7 +730,7 @@ private:
 
 MissionType DestroyVehicleMission::Prepare() {
 	Logger.Write("DestroyVehicleMission::Prepare()", LogNormal);
-	Vector4 vehicle_spawn_position = SelectASpawnPoint(playerPed, vehicle_spawn_points, reserved_vehicle_spawn_points, spawn_point_max_search_range, spawn_point_min_search_range, number_of_tries_to_find_spawn_point);
+	Vector4 vehicle_spawn_position = SelectASpawnPoint(playerPed, vehicle_spawn_points, reserved_vehicle_spawn_points, spawn_point_maximum_range, spawn_point_minimum_range, number_of_tries_to_select_items);
 	if (vehicle_spawn_position.x == 0.0f && vehicle_spawn_position.y == 0.0f && vehicle_spawn_position.z == 0.0f && vehicle_spawn_position.h == 0.0f) return NO_Mission;
 	std::vector<char *> vehicle_names = { "rebel", "rancherxl", "dloader", "voodoo2", "bfinjection", 
 												"sanchez2", "hexer", "daemon", "journey", "sadler" };
@@ -709,7 +783,7 @@ public:
 	MissionType Timeout();
 private:
 	Vehicle vehicle_to_steal_ = NULL;
-	Vector3 drop_off_coordinates = { static_cast<DWORD>(1226.06), static_cast<DWORD>(-3231.36), static_cast<DWORD>(6.02) };
+	Vector3 drop_off_coordinates;
 	Blip vehicle_blip_ = NULL;
 	Blip drop_off_blip_ = NULL;
 	int vehicle_primary_color_initial_, vehicle_secondary_color_initial_;
@@ -720,16 +794,18 @@ private:
 
 MissionType StealVehicleMission::Prepare() {
 	Logger.Write("StealVehicleMission.Prepare()", LogNormal);
-	Vector4 vehicle_spawn_position = SelectASpawnPoint(playerPed, vehicle_spawn_points, reserved_vehicle_spawn_points, spawn_point_max_search_range, spawn_point_min_search_range, number_of_tries_to_find_spawn_point);
+	drop_off_coordinates.x = 1226.06; drop_off_coordinates.y = -3231.36; drop_off_coordinates.z = 6.02;
+	Vector4 vehicle_spawn_position = SelectASpawnPoint(playerPed, vehicle_spawn_points, reserved_vehicle_spawn_points, spawn_point_maximum_range, spawn_point_minimum_range, number_of_tries_to_select_items);
 	if (vehicle_spawn_position.x == 0.0f && vehicle_spawn_position.y == 0.0f && vehicle_spawn_position.z == 0.0f && vehicle_spawn_position.h == 0.0f) return NO_Mission;
-	Hash vehicle_model = possible_vehicle_models[(rand() % possible_vehicle_models.size())]; // pick a random model from our set, pray that it's still loaded in memory?
-	STREAMING::REQUEST_MODEL(vehicle_model); // oh wait no, we can just load it.
-	while (!STREAMING::HAS_MODEL_LOADED(vehicle_model)) WAIT(0);
-	vehicle_to_steal_ = VEHICLE::CREATE_VEHICLE(vehicle_model, vehicle_spawn_position.x, vehicle_spawn_position.y, vehicle_spawn_position.z, vehicle_spawn_position.h, 0, 0);
+	Hash vehicle_hash = SelectAVehicleModel(possible_vehicle_models, vehicle_classes_that_can_be_selected, number_of_tries_to_select_items);
+	if (vehicle_hash == NULL) return NO_Mission;
+	STREAMING::REQUEST_MODEL(vehicle_hash); // oh wait no, we can just load it.
+	while (!STREAMING::HAS_MODEL_LOADED(vehicle_hash)) WAIT(0);
+	vehicle_to_steal_ = VEHICLE::CREATE_VEHICLE(vehicle_hash, vehicle_spawn_position.x, vehicle_spawn_position.y, vehicle_spawn_position.z, vehicle_spawn_position.h, 0, 0);
 	VEHICLE::SET_VEHICLE_ON_GROUND_PROPERLY(vehicle_to_steal_);
 	vehicle_blip_ = UI::ADD_BLIP_FOR_ENTITY(vehicle_to_steal_);
 	if (use_default_blip) UI::SET_BLIP_SPRITE(vehicle_blip_, 1);
-	else if (VEHICLE::IS_THIS_MODEL_A_CAR(vehicle_model)) UI::SET_BLIP_SPRITE(vehicle_blip_, 225);
+	else if (VEHICLE::IS_THIS_MODEL_A_CAR(vehicle_hash)) UI::SET_BLIP_SPRITE(vehicle_blip_, 225);
 	else UI::SET_BLIP_SPRITE(vehicle_blip_, 226);
 	UI::SET_BLIP_COLOUR(vehicle_blip_, 5);
 	UI::SET_BLIP_DISPLAY(vehicle_blip_, (char)"you will never see this");
@@ -742,7 +818,7 @@ MissionType StealVehicleMission::Execute() {
 	//Logger.Write("StealVehicleMission::Execute()", LogVerbose);
 	if (!VEHICLE::IS_VEHICLE_DRIVEABLE(vehicle_to_steal_, 1)) {
 		CreateNotification("The ~y~special vehicle~w~ has been destroyed.", play_notification_beeps);
-		if (mission_objective_ = DeliverCar) UI::REMOVE_BLIP(&drop_off_blip_);
+		if (mission_objective_ == DeliverCar) UI::REMOVE_BLIP(&drop_off_blip_);
 		UI::REMOVE_BLIP(&vehicle_blip_);
 		ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&vehicle_to_steal_);
 		return NO_Mission;
@@ -755,6 +831,7 @@ MissionType StealVehicleMission::Execute() {
 			mission_objective_ = ResprayCar;
 		}
 	}
+
 	
 	if (mission_objective_ == ResprayCar) {
 		VEHICLE::GET_VEHICLE_COLOURS(vehicle_to_steal_, &vehicle_primary_color_compare_, &vehicle_secondary_color_compare_);
@@ -770,7 +847,7 @@ MissionType StealVehicleMission::Execute() {
 		}
 	}
 
-	if (mission_objective_ = DeliverCar) {
+	if (mission_objective_ == DeliverCar) {
 		GRAPHICS::DRAW_MARKER(1, drop_off_coordinates.x, drop_off_coordinates.y, drop_off_coordinates.z, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 5.0f, 5.0f, 1.0f, 204, 204, 0, 100, false, false, 2, false, false, false, false);
 		Vector3 vehicle_coordinates = ENTITY::GET_ENTITY_COORDS(vehicle_to_steal_, 0);
 		float dropOffDistance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(vehicle_coordinates.x, vehicle_coordinates.y, vehicle_coordinates.z, drop_off_coordinates.x, drop_off_coordinates.y, drop_off_coordinates.z, 0);
@@ -784,6 +861,7 @@ MissionType StealVehicleMission::Execute() {
 			UI::REMOVE_BLIP(&drop_off_blip_);
 			UI::REMOVE_BLIP(&vehicle_blip_);
 			ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&vehicle_to_steal_);
+			mission_objective_ = GetCar;
 			return NO_Mission;
 		}
 	}
@@ -833,7 +911,7 @@ void MissionHandler::Update() {
 		ticks_since_last_mission_ = 0;  // Clear the timer since the last mission. This won't increment again until current_mission_type_ equals NO_Mission.
 		ticks_since_mission_start_ = 0; // initialize the timeout delay as well, since it's about to begin incrementing.
 		//current_mission_type_ = MissionType(rand() % MAX_Mission); // what a silly and convoluted method, but w.e
-		current_mission_type_ = DestroyVehicle;
+		current_mission_type_ = StealVehicle;
 		switch (current_mission_type_) {
 		case StealVehicle	:	current_mission_type_ = StealVehicleMission.Prepare();		break; // Prepare()s should return their MissionType on success.
 		case DestroyVehicle	:	current_mission_type_ = DestroyVehicleMission.Prepare();	break; // If something goes wrong (StealVehicleMission takes too
@@ -869,8 +947,8 @@ void Update() {
 	//Logger.Write("Update()", LogNormal);
 	playerPed = PLAYER::PLAYER_PED_ID();
 	player = PLAYER::PLAYER_ID(); // need to be updated every cycle?
-	vehicle_spawn_points = GetParkedCarsFromWorld(playerPed, vehicle_spawn_points, maximum_number_of_spawn_points, vehicle_search_range_minimum);
-	possible_vehicle_models = GetVehicleModelsFromWorld(playerPed, possible_vehicle_models, maximum_number_of_vehicle_models, vehicle_search_range_minimum);
+	vehicle_spawn_points = GetParkedVehiclesFromWorld(playerPed, vehicle_spawn_points, maximum_number_of_spawn_points, vehicle_search_range_minimum);
+	possible_vehicle_models = GetVehicleModelsFromWorld(playerPed, possible_vehicle_models, maximum_number_of_vehicle_models);
 	return;
 }
 
@@ -878,7 +956,7 @@ void UglyHackForVehiclePersistenceScripts(uint seconds) {
 	Logger.Write("UglyHackForVehiclePersistenceScripts()", LogNormal);
 	if (!(seconds > 0)) return; // no point in wasting time or spawns if the user doesn't use a persistence script.
 	WAIT(DWORD(seconds * 1000)); // let the persistence script start up and spawn its own vehicles.
-	reserved_vehicle_spawn_points = GetParkedCarsFromWorld(playerPed, reserved_vehicle_spawn_points, maximum_number_of_spawn_points, vehicle_search_range_minimum); // set aside these spawns. Note that some legitimate spawns will invariably get reserved. This is why it's an ugly hack.
+	reserved_vehicle_spawn_points = GetParkedVehiclesFromWorld(playerPed, reserved_vehicle_spawn_points, maximum_number_of_spawn_points, vehicle_search_range_minimum); // set aside these spawns. Note that some legitimate spawns will invariably get reserved. This is why it's an ugly hack.
 	Logger.Write("reserved_vehicle_spawn_points_parked.size(): " + std::to_string(reserved_vehicle_spawn_points.size()), LogNormal);
 	return;
 }
@@ -900,21 +978,16 @@ void GetSettingsFromIniFile() {
 	use_default_blip = Reader.ReadBoolean("Options", "use_default_blip", false);
 	mission_timeout = Reader.ReadInteger("Options", "mission_timeout", 360);
 	mission_cooldown = std::max((Reader.ReadInteger("Options", "mission_cooldown", 30)), 5);
-	maximum_number_of_spawn_points = Reader.ReadInteger("Options", "maximum_number_of_spawn_points", 10000);
-	maximum_number_of_vehicle_models = Reader.ReadInteger("Options", "maximum_number_of_vehicle_models", 1000);
-	vehicle_search_range_minimum = Reader.ReadInteger("Options", "vehicle_search_range_minimum", 50);
-	spawn_point_min_search_range = Reader.ReadInteger("Options", "vehicle_spawn_point_minimum_range", 666);
-	spawn_point_max_search_range = Reader.ReadInteger("Options", "vehicle_spawn_point_maximum_range", 1332);
+	spawn_point_minimum_range = Reader.ReadInteger("Options", "spawn_point_minimum_range", 666);
+	spawn_point_maximum_range = Reader.ReadInteger("Options", "spawn_point_maximum_range", 1998);
 	mission_minimum_range_for_timeout = Reader.ReadInteger("Options", "mission_minimum_range_for_timeout", 666);
 	// DEBUG
-	logging_level = Reader.ReadInteger("Debug", "logging_level", 0);
+	logging_level = LogLevel(Reader.ReadInteger("Debug", "logging_level", 0));
 	seconds_to_wait_for_vehicle_persistence_scripts = Reader.ReadInteger("Debug", "seconds_to_wait_for_vehicle_persistence_scripts", 15);
-	number_of_tries_to_find_spawn_point = Reader.ReadInteger("Debug", "number_of_tries_to_find_spawn_point", 1000);
-	notify_get_parked_cars_in_range = Reader.ReadBoolean("Debug", "notify_get_parked_cars_in_range", false);
-	notify_number_of_possible_vehicle_models = Reader.ReadBoolean("Debug", "notify_number_of_possible_vehicle_models", false);
-	notify_number_of_possible_spawn_points = Reader.ReadBoolean("Debug", "notify_number_of_possible_spawn_points", false);
-	notify_distance_to_spawn_point = Reader.ReadBoolean("Debug", "notify_distance_to_spawn_point", false);
-	notify_number_of_reserved_spawn_points = Reader.ReadBoolean("Debug", "notify_number_of_reserved_spawn_points", false);
+	number_of_tries_to_select_items = Reader.ReadInteger("Debug", "number_of_tries_to_select_items", 100);
+	vehicle_search_range_minimum = Reader.ReadInteger("Options", "vehicle_search_range_minimum", 30);
+	maximum_number_of_spawn_points = Reader.ReadInteger("Options", "maximum_number_of_spawn_points", 10000);
+	maximum_number_of_vehicle_models = Reader.ReadInteger("Options", "maximum_number_of_vehicle_models", 1000);
 	return;
 }
 
@@ -922,8 +995,11 @@ void main() {
 	Logger.Write("main()", LogNormal);
 
 	GetSettingsFromIniFile();
+	Logger.SetLoggingLevel(logging_level);
+
 	InitialWaitForGame(1); // ehh... I don't even know if any additional wait time is necessary...
 	UglyHackForVehiclePersistenceScripts(seconds_to_wait_for_vehicle_persistence_scripts); // UGLY HACK FOR VEHICLE PERSISTENCE!
+	
 	MissionHandler Handler;
 
 	while (true) {
