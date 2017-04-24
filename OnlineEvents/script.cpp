@@ -138,7 +138,7 @@ void PlayNotificationBeep() {
 }
 
 void CreateNotification(char* message, bool is_beep_enabled) {
-	Logger.Write("CreateNotification()", LogVerbose);
+	Logger.Write("CreateNotification(): " + std::string(message), LogVerbose);
 	UI::_SET_NOTIFICATION_TEXT_ENTRY("STRING");
 	UI::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME(message);
 	UI::_DRAW_NOTIFICATION(0, 1);
@@ -227,7 +227,9 @@ Hash GetHashOfVehicleModel(Vehicle vehicle) {
 }
 
 int GetVehicleClassFromHash(Hash hash) {
+	Logger.Write("GetVehicleClassFromHash():", LogVeryVerbose); // from strings.h because c++ sucks at some things.
 	int raw_int = VEHICLE::GET_VEHICLE_CLASS_FROM_NAME(hash);
+	Logger.Write("GetVehicleClassFromHash(): " + std::string(VehicleClasses[raw_int]), LogNormal); // from strings.h because c++ sucks at some things.
 	switch (raw_int) {
 	case  0: return SelectCompacts;
 	case  1: return SelectSedans;
@@ -306,8 +308,6 @@ std::vector<Hash> GetVehicleModelsFromWorld(Ped ped, std::vector<Hash> vector_of
 			if (DoesEntityExistAndIsNotNull(all_world_vehicles[i])) {
 				Vehicle this_vehicle = all_world_vehicles[i];
 				Vector3 this_vehicle_coordinates = ENTITY::GET_ENTITY_COORDS(this_vehicle, 0);
-				char *this_vehicle_display_name = VEHICLE::GET_DISPLAY_NAME_FROM_VEHICLE_MODEL(this_vehicle);
-				char *this_vehicle_string_literal = UI::_GET_LABEL_TEXT(this_vehicle_display_name);
 				if (DoesEntityExistAndIsNotNull(this_vehicle)) {
 					Hash this_vehicle_hash = GetHashOfVehicleModel(this_vehicle);
 					auto predicate = [this_vehicle_hash](const Hash & item) { // pretty sure this isn't necessary for hashes, but it works.
@@ -317,11 +317,13 @@ std::vector<Hash> GetVehicleModelsFromWorld(Ped ped, std::vector<Hash> vector_of
 					if (!found) {
 						char *this_vehicle_display_name = VEHICLE::GET_DISPLAY_NAME_FROM_VEHICLE_MODEL(this_vehicle_hash);
 						char *this_vehicle_string_literal = UI::_GET_LABEL_TEXT(this_vehicle_display_name);
-						int vehicle_class = VEHICLE::GET_VEHICLE_CLASS_FROM_NAME(this_vehicle_hash);
-						if (!VEHICLE::_IS_VEHICLE_SHOP_RESPRAY_ALLOWED(this_vehicle)) {
-							//Logger.Write("GetVehicleModelsFromWorld(): !VEHICLE::_IS_VEHICLE_SHOP_RESPRAY_ALLOWED(): " + std::string(this_vehicle_string_literal), LogVerbose);
-							//Logger.Write("GetVehicleModelsFromWorld(): !VEHICLE::_IS_VEHICLE_SHOP_RESPRAY_ALLOWED(): " + std::to_string(vehicle_class), LogVerbose);
-						}
+						Logger.Write("GetVehicleModelsFromWorld(): " + std::string(this_vehicle_string_literal), LogVerbose);
+						//Blip test_blip;
+						//test_blip = UI::GET_BLIP_FROM_ENTITY(this_vehicle);
+						//if (test_blip) {
+						//	UI::SET_BLIP_COLOUR(test_blip, 0);
+						//	UI::SET_BLIP_SPRITE(test_blip, 1);
+						//}
 						vector_of_hashes.push_back(this_vehicle_hash);
 					}
 					if (vector_of_hashes.size() > maximum_vector_size) vector_of_hashes.erase(vector_of_hashes.begin()); // also pretty sure there's not more than a thousand models in the game, but safety first...
@@ -377,11 +379,11 @@ std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vector4> ve
 }
 
 Vector4 SelectASpawnPoint(Ped pedestrian, std::vector<Vector4> vector_of_vector4s_to_search, std::vector<Vector4> vector_of_vector4s_to_exclude, uint max_range, uint min_range, uint max_tries) {
-	Logger.Write("SelectASpawnPoint()", LogNormal);
+	Logger.Write("SelectASpawnPoint(): selecting from " + std::to_string(vector_of_vector4s_to_search.size()) + " spawn points", LogVerbose);
 	Vector3 pedestrian_coordinates = ENTITY::GET_ENTITY_COORDS(pedestrian, 0);
 	Vector4 empty_spawn_point;
 	if (vector_of_vector4s_to_search.size() == 0) {
-		Logger.Write("search vector was empty, returning an empty Vector4!", LogError);
+		Logger.Write("SelectASpawnPoint(): vector_of_vector4s_to_search was empty, returning an empty Vector4!", LogError);
 		return empty_spawn_point;
 	}
 	for (uint i = 0; i < max_tries; i++) {
@@ -394,32 +396,35 @@ Vector4 SelectASpawnPoint(Ped pedestrian, std::vector<Vector4> vector_of_vector4
 			};
 			bool found_in_exclude_vector = (std::find_if(vector_of_vector4s_to_exclude.begin(), vector_of_vector4s_to_exclude.end(), predicate) != vector_of_vector4s_to_exclude.end()); // make sure this_vehicle_position does not already exist in vector_of_vector4s
 			if (!found_in_exclude_vector) {
+				Logger.Write("SelectASpawnPoint(): chose a point after " + std::to_string(i+1) + " tries (distance: " + std::to_string(distance) + " meters)", LogVerbose);
 				return spawn_point;
 			}
 		}
 		WAIT(0);
 	}
-	Logger.Write("SelectASpawnPoint() exceeded max_tries, returning an empty Vector4!", LogError);
+	Logger.Write("SelectASpawnPoint(): exceeded " + std::to_string(max_tries) + " tries, returning an empty Vector4!", LogError);
 	return empty_spawn_point;
 }
 
 Hash SelectAVehicleModel(std::vector<Hash> vector_of_hashes_to_search, uint vehicle_class_options, uint max_tries) {
-	Logger.Write("SelectAVehicleModel()", LogNormal);
+	Logger.Write("SelectAVehicleModel(): selecting from " + std::to_string(vector_of_hashes_to_search.size()) + " Hashes", LogVerbose);
 	Hash empty_hash;
 	if (vector_of_hashes_to_search.size() == 0) {
-		Logger.Write("SelectAVehicleModel() vector_of_hashes_to_search was empty, returning an empty hash!", LogError);
+		Logger.Write("SelectAVehicleModel(): vector_of_hashes_to_search was empty, returning an empty Hash!", LogError);
 		return empty_hash;
 	}
 	for (uint i = 0; i < max_tries; i++) {
 		Hash vehicle_hash = vector_of_hashes_to_search[(rand() % vector_of_hashes_to_search.size())]; // pick a random model from our set...
 		char *this_vehicle_display_name = VEHICLE::GET_DISPLAY_NAME_FROM_VEHICLE_MODEL(vehicle_hash);
 		char *this_vehicle_string_literal = UI::_GET_LABEL_TEXT(this_vehicle_display_name);
-		Logger.Write("SelectAVehicleModel(): VEHICLE::GET_DISPLAY_NAME_FROM_VEHICLE_MODEL(vehicle_hash): " + std::string(this_vehicle_string_literal), LogVerbose);
+		Logger.Write("SelectAVehicleModel(): " + std::string(this_vehicle_string_literal) + "...?", LogVerbose);
 		int vehicle_class = GetVehicleClassFromHash(vehicle_hash);
-		Logger.Write("SelectAVehicleModel(): VEHICLE::GET_VEHICLE_CLASS(vehicle_model): " + std::string(VehicleClasses[vehicle_class]), LogVerbose); // from strings.h because c++ sucks at some things.
-		if (vehicle_class_options & vehicle_class) return vehicle_hash;
+		if (vehicle_class_options & vehicle_class) {
+			Logger.Write("SelectAVehicleModel(): chose a model after " + std::to_string(i+1) + " tries ( " + std::string(this_vehicle_string_literal) + " )", LogVerbose);
+			return vehicle_hash;
+		}
 	}
-	Logger.Write("SelectAVehicleModel() exceeded max_tries, returning an empty hash!", LogError);
+	Logger.Write("SelectAVehicleModel(): exceeded " + std::to_string(max_tries) + " tries, returning an empty Hash!", LogError);
 	return empty_hash;
 }
 
@@ -735,7 +740,9 @@ MissionType DestroyVehicleMission::Prepare() {
 	std::vector<char *> vehicle_names = { "rebel", "rancherxl", "dloader", "voodoo2", "bfinjection", 
 												"sanchez2", "hexer", "daemon", "journey", "sadler" };
 	Hash vehicle_model = GAMEPLAY::GET_HASH_KEY(vehicle_names[rand() % vehicle_names.size()]);
-	//Hash vehicle_model_to_use = possible_vehicle_models[(rand() % possible_vehicle_models.size())];
+
+	// I can pass flags for just SUV, offroad, etc!
+
 	STREAMING::REQUEST_MODEL(vehicle_model);
 	while (!STREAMING::HAS_MODEL_LOADED(vehicle_model)) WAIT(0);
 	vehicle_to_destroy_ = VEHICLE::CREATE_VEHICLE(vehicle_model, vehicle_spawn_position.x, vehicle_spawn_position.y, vehicle_spawn_position.z, vehicle_spawn_position.h, 0, 0);
@@ -794,7 +801,7 @@ private:
 
 MissionType StealVehicleMission::Prepare() {
 	Logger.Write("StealVehicleMission.Prepare()", LogNormal);
-	drop_off_coordinates.x = 1226.06; drop_off_coordinates.y = -3231.36; drop_off_coordinates.z = 6.02;
+	drop_off_coordinates.x = 1226.06; drop_off_coordinates.y = -3231.36; drop_off_coordinates.z = 5.02;
 	Vector4 vehicle_spawn_position = SelectASpawnPoint(playerPed, vehicle_spawn_points, reserved_vehicle_spawn_points, spawn_point_maximum_range, spawn_point_minimum_range, number_of_tries_to_select_items);
 	if (vehicle_spawn_position.x == 0.0f && vehicle_spawn_position.y == 0.0f && vehicle_spawn_position.z == 0.0f && vehicle_spawn_position.h == 0.0f) return NO_Mission;
 	Hash vehicle_hash = SelectAVehicleModel(possible_vehicle_models, vehicle_classes_that_can_be_selected, number_of_tries_to_select_items);
@@ -976,11 +983,11 @@ void GetSettingsFromIniFile() {
 	// OPTIONS
 	play_notification_beeps = Reader.ReadBoolean("Options", "play_notification_beeps", true);
 	use_default_blip = Reader.ReadBoolean("Options", "use_default_blip", false);
-	mission_timeout = Reader.ReadInteger("Options", "mission_timeout", 360);
-	mission_cooldown = std::max((Reader.ReadInteger("Options", "mission_cooldown", 30)), 5);
-	spawn_point_minimum_range = Reader.ReadInteger("Options", "spawn_point_minimum_range", 666);
-	spawn_point_maximum_range = Reader.ReadInteger("Options", "spawn_point_maximum_range", 1998);
-	mission_minimum_range_for_timeout = Reader.ReadInteger("Options", "mission_minimum_range_for_timeout", 666);
+	mission_timeout = std::max(Reader.ReadInteger("Options", "mission_timeout", 360), 180);
+	mission_cooldown = std::max((Reader.ReadInteger("Options", "mission_cooldown", 30)), 30);
+	spawn_point_minimum_range = Reader.ReadInteger("Options", "spawn_point_minimum_range", 1000);
+	spawn_point_maximum_range = Reader.ReadInteger("Options", "spawn_point_maximum_range", 3000);
+	mission_minimum_range_for_timeout = Reader.ReadInteger("Options", "mission_minimum_range_for_timeout", 333);
 	// DEBUG
 	logging_level = LogLevel(Reader.ReadInteger("Debug", "logging_level", 0));
 	seconds_to_wait_for_vehicle_persistence_scripts = Reader.ReadInteger("Debug", "seconds_to_wait_for_vehicle_persistence_scripts", 15);
@@ -1000,6 +1007,8 @@ void main() {
 	InitialWaitForGame(1); // ehh... I don't even know if any additional wait time is necessary...
 	UglyHackForVehiclePersistenceScripts(seconds_to_wait_for_vehicle_persistence_scripts); // UGLY HACK FOR VEHICLE PERSISTENCE!
 	
+	CreateNotification("~r~Online Events Redux!~w~ v0.1", play_notification_beeps);
+
 	MissionHandler Handler;
 
 	while (true) {
