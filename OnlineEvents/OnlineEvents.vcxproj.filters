@@ -17,7 +17,6 @@
     <ClInclude Include="..\..\inc\types.h">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="script.h" />
     <ClInclude Include="..\..\inc\main.h">
       <Filter>include</Filter>
     </ClInclude>
@@ -30,7 +29,7 @@
     <ClInclude Include="Log.h">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="strings.h">
+    <ClInclude Include="script.h">
       <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>
