@@ -800,10 +800,11 @@ MissionType StealVehicleMission::Prepare() {
 	drop_off_coordinates.x = 1226.06; drop_off_coordinates.y = -3231.36; drop_off_coordinates.z = 5.02;
 	Vector4 vehicle_spawn_position = SelectASpawnPoint(playerPed, vehicle_spawn_points, reserved_vehicle_spawn_points, spawn_point_maximum_range, spawn_point_minimum_range, number_of_tries_to_select_items);
 	if (vehicle_spawn_position.x == 0.0f && vehicle_spawn_position.y == 0.0f && vehicle_spawn_position.z == 0.0f && vehicle_spawn_position.h == 0.0f) return NO_Mission;
-	switch (int(rand() % 5)) {
-	case 0: stealable_vehicle_flags = default_stealable_vehicle_flags;									break;
-	case 1: stealable_vehicle_flags = default_stealable_vehicle_flags & ~SelectSuper;					break;
-	case 2: stealable_vehicle_flags = default_stealable_vehicle_flags & ~(SelectSuper | SelectSports);	break;
+	switch (GetFromUniformIntDistribution(1, 10)) {
+	
+	case 2: stealable_vehicle_flags = default_stealable_vehicle_flags & ~SelectSuper;					break;
+	case 3: stealable_vehicle_flags = default_stealable_vehicle_flags & ~(SelectSuper | SelectSports);	break;
+	default: stealable_vehicle_flags = default_stealable_vehicle_flags;									break;
 	}
 	vehicle_hash_ = SelectAVehicleModel(possible_vehicle_models, stealable_vehicle_flags, number_of_tries_to_select_items);
 	if (vehicle_hash_ == NULL) return NO_Mission;

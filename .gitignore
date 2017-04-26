@@ -267,3 +267,6 @@ __pycache__/
 *.ipdb
 *.iobj
 *.asi
+
+*.vcxproj
+*.vcxproj.filters
