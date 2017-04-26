@@ -47,8 +47,6 @@ enum VehiclesToSelect {
 	SelectTrains = 0x200000,
 };
 
-void ScriptMain();
-
 static char *VehicleClasses[] =
 {
 	"VehicleClassCompacts",
@@ -74,3 +72,5 @@ static char *VehicleClasses[] =
 	"VehicleClassCommercial",
 	"VehicleClassTrains",
 };
+
+void ScriptMain();

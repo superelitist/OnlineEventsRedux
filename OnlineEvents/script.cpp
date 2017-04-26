@@ -26,56 +26,12 @@ Log Logger(".\\OnlineEvents.log", LogNormal);
 #pragma warning(disable : 4244 4305) // double <-> float conversions
 #pragma warning(disable : 4302)
 
-//int model;
-//int val;
-// LEGACY VARIABLES MOST OF WHICH ALMOST CERTAINLY SHOULD NOT BE GLOBAL BUT WHATEVER
-// LEGACY VARIABLES MOST OF WHICH ALMOST CERTAINLY SHOULD NOT BE GLOBAL BUT WHATEVER
-// LEGACY VARIABLES MOST OF WHICH ALMOST CERTAINLY SHOULD NOT BE GLOBAL BUT WHATEVER
-//int timer_start_minute, type_of_event;
-//int missionTime = 0;
-//int waitTime = 0;
-//bool ready_to_prepare_mission = false;
-//bool timer_is_started = false;
-//bool mission_is_prepared = false;
-//bool eventOver = false;
-//bool specialCrate = false;
-//Vehicle vehicle_to_steal;
-//Blip vehicle_blip;
-// bool player_acquired_vehicle_ = false;
-//bool gotColor = false;
-//bool resprayed = false;
-//bool blipMade = false;
-//int red1, green1, blue1;
-//int red2, green2, blue2;
-//int Sred1, Sgreen1, Sblue1;
-//int Sred2, Sgreen2, Sblue2;
-//int primary1, secondary1;
-//int vehicle_primary_color_compare_, secondary2;
-//int wanted;
-//Blip drop_off_blip_;
-//Vehicle smugglerVehicle;
-//Blip smugglerBlip;
-//Blip crateBlip;
-//Vector3 crateSpawn;
-//bool crateMade = false;
-//bool spawnguards = false;
-//Object crate;
-//Ped guard1, guard2, guard3, guard4, guard5, guard6, guard7, guard8, guard9, guard10;
-//Ped assassination_target;
-//Blip targetBlip;
-//Vehicle armored_truck;
-//Blip truckBlip;
-//Object case1, case2, case3;
-//Vector3 truckPos;
-//Ped truck_driver_;
-//bool driverMade = false;
-// LEGACY VARIABLES MOST OF WHICH ALMOST CERTAINLY SHOULD NOT BE GLOBAL BUT WHATEVER
-// LEGACY VARIABLES MOST OF WHICH ALMOST CERTAINLY SHOULD NOT BE GLOBAL BUT WHATEVER
-// LEGACY VARIABLES MOST OF WHICH ALMOST CERTAINLY SHOULD NOT BE GLOBAL BUT WHATEVER
+//GAMEPLAY::GET_HEADING_FROM_VECTOR_2D
+// OBJECT::_GET_OBJECT_OFFSET_FROM_COORDS
+// GAMEPLAY::GET_ANGLE_BETWEEN_2D_VECTORS
+// GAMEPLAY::GET_HEADING_FROM_VECTOR_2D
 
 std::random_device random_device; std::mt19937 generator(random_device()); // init a standard mersenne_twister_engine
-
-float radians = 0.0174533;
 
 Ped playerPed; // breaks naming convention because 
 Player player;
@@ -99,7 +55,7 @@ int default_stealable_vehicle_flags = SelectCompacts | SelectSedans | SelectSUVs
 										SelectMuscle | SelectSportsClassics | SelectSports | SelectSuper |
 										SelectMotorcycles | SelectOffRoad;
 
-int default_destroyable_vehicle_classes = SelectSUVs | SelectMuscle | SelectOffRoad;
+int default_destroyable_vehicle_classes = SelectSUVs | SelectMuscle | SelectOffRoad | SelectMotorcycles;
 
 void NotifyBottomCenter(char* message) {
 	Logger.Write("NotifyBottomCenter()", LogExtremelyVerbose);
@@ -671,14 +627,7 @@ MissionType ArmoredTruckMission::Execute() {
 	}
 	if (VEHICLE::IS_VEHICLE_DOOR_FULLY_OPEN(armored_truck_, 2) || VEHICLE::IS_VEHICLE_DOOR_FULLY_OPEN(armored_truck_, 3)) {
 		Pickup case1; Pickup case2; Pickup case3;
-
-		//GAMEPLAY::GET_HEADING_FROM_VECTOR_2D
-
-		// OBJECT::_GET_OBJECT_OFFSET_FROM_COORDS
-		// GAMEPLAY::GET_ANGLE_BETWEEN_2D_VECTORS
-		// GAMEPLAY::GET_HEADING_FROM_VECTOR_2D
 		Vector3 behind_truck = GetCoordinatesByOriginBearingAndDistance(truck_position, 180, 2.5f);
-		
 		int random = rand() % 3;
 		switch (random) { // falls through!
 		case 0:
@@ -702,8 +651,6 @@ MissionType ArmoredTruckMission::Execute() {
 	}
 	return ArmoredTruck;
 }
-
-
 
 MissionType ArmoredTruckMission::Timeout() {
 	Logger.Write("ArmoredTruckMission::Timeout()", LogExtremelyVerbose);
@@ -994,9 +941,6 @@ void MissionHandler::Update() {
 	tick_count_at_last_update_ = GetTickCount64();
 
 	if (ticks_since_last_mission_ > ticks_between_missions_) { // Enough time has passed that we can start a new mission.
-		ticks_since_last_mission_ = 0;  // Clear the timer since the last mission. This won't increment again until current_mission_type_ equals NO_Mission.
-		ticks_since_mission_start_ = 0; // initialize the timeout delay as well, since it's about to begin incrementing.
-		
 		current_mission_type_ = MissionType(rand() % MAX_Mission); // I used to think this was silly. Now I think it's awesome.
 		switch (current_mission_type_) {
 		case StealVehicle	:	current_mission_type_ = StealVehicleMission.Prepare();		break; // Prepare()s should return their MissionType on success.
@@ -1004,6 +948,10 @@ void MissionHandler::Update() {
 		case Assassination	:	current_mission_type_ = AssassinationMission.Prepare();		break; // long to find a vehicle), they can return NO_Mission
 		case ArmoredTruck	:	current_mission_type_ = ArmoredTruckMission.Prepare();		break;
 		case CrateDrop		:	current_mission_type_ = CrateDropMission.Prepare();			break;
+		}
+		if (current_mission_type_ != NO_Mission) {
+			ticks_since_last_mission_ = 0;  // Clear the timer since the last mission. This won't increment again until current_mission_type_ equals NO_Mission.
+			ticks_since_mission_start_ = 0; // initialize the timeout delay as well, since it's about to begin incrementing.
 		}
 	}
 	
@@ -1030,11 +978,32 @@ void MissionHandler::Update() {
 }
 
 void Update() {
-	//Logger.Write("Update()", LogNormal);
+	Logger.Write("Update()", LogExtremelyVerbose);
 	playerPed = PLAYER::PLAYER_PED_ID();
 	player = PLAYER::PLAYER_ID(); // need to be updated every cycle?
 	vehicle_spawn_points = GetParkedVehiclesFromWorld(playerPed, vehicle_spawn_points, maximum_number_of_spawn_points, vehicle_search_range_minimum);
 	possible_vehicle_models = GetVehicleModelsFromWorld(playerPed, possible_vehicle_models, maximum_number_of_vehicle_models);
+	return;
+}
+
+void WaitDuringDeathArrestOrLoading(uint seconds) {
+	Logger.Write("PauseDuringDeathArrestOrLoading()", LogExtremelyVerbose);
+	if (ENTITY::IS_ENTITY_DEAD(PLAYER::PLAYER_PED_ID())) {
+		Logger.Write("PauseDuringDeathArrestOrLoading(): Player is Wasted, waiting for player...", LogNormal);
+		while (ENTITY::IS_ENTITY_DEAD(PLAYER::PLAYER_PED_ID())) WAIT(0);
+	}
+
+	if (PLAYER::IS_PLAYER_BEING_ARRESTED(PLAYER::PLAYER_ID(), TRUE)) {
+		Logger.Write("PauseDuringDeathArrestOrLoading(): Player is Busted, waiting for player...", LogNormal);
+		while (PLAYER::IS_PLAYER_BEING_ARRESTED(PLAYER::PLAYER_ID(), TRUE)) WAIT(0);
+	}
+	if (DLC2::GET_IS_LOADING_SCREEN_ACTIVE()) {
+		Logger.Write("PauseDuringDeathArrestOrLoading(): Loading screen is active, waiting for game...", LogNormal);
+		while (DLC2::GET_IS_LOADING_SCREEN_ACTIVE()) WAIT(0);
+		
+	}
+	WAIT(seconds * 1000);
+	Logger.Write("PauseDuringDeathArrestOrLoading(): Returning to game.", LogNormal);
 	return;
 }
 
@@ -1047,28 +1016,18 @@ void UglyHackForVehiclePersistenceScripts(uint seconds) {
 	return;
 }
 
-void InitialWaitForGame(uint seconds) {
-	Logger.Write("InitialWaitForGame()", LogNormal);
-	while (true) {
-		if (!DLC2::GET_IS_LOADING_SCREEN_ACTIVE()) if (PLAYER::IS_PLAYER_PLAYING(player)) break; // this appears to work...
-		WAIT(0);
-	}
-	WAIT(seconds * 1000);
-	return;
-}
-
 void GetSettingsFromIniFile() {
 	Logger.Write("GetSettingsFromIniFile()", LogNormal);
 	// OPTIONS
 	play_notification_beeps = Reader.ReadBoolean("Options", "play_notification_beeps", true);
 	use_default_blip = Reader.ReadBoolean("Options", "use_default_blip", false);
 	mission_timeout = std::max(Reader.ReadInteger("Options", "mission_timeout", 360), 180);
-	mission_cooldown = std::max(Reader.ReadInteger("Options", "mission_cooldown", 60), 30);
+	mission_cooldown = std::max(Reader.ReadInteger("Options", "mission_cooldown", 60), 30); // these minimums should be mentioned in the ini.
 	spawn_point_minimum_range = Reader.ReadInteger("Options", "spawn_point_minimum_range", 1000);
 	spawn_point_maximum_range = Reader.ReadInteger("Options", "spawn_point_maximum_range", 3000);
 	mission_minimum_range_for_timeout = Reader.ReadInteger("Options", "mission_minimum_range_for_timeout", 333);
 	// DEBUG
-	logging_level = LogLevel (std::max(Reader.ReadInteger("Debug", "logging_level", 1), 1));
+	logging_level = LogLevel (std::max(Reader.ReadInteger("Debug", "logging_level", 1), 1)); // right now at least, I don't want to let anyone turn logging entirely off.
 	seconds_to_wait_for_vehicle_persistence_scripts = Reader.ReadInteger("Debug", "seconds_to_wait_for_vehicle_persistence_scripts", 0);
 	number_of_tries_to_select_items = Reader.ReadInteger("Debug", "number_of_tries_to_select_items", 100);
 	vehicle_search_range_minimum = Reader.ReadInteger("Options", "vehicle_search_range_minimum", 30);
@@ -1079,18 +1038,11 @@ void GetSettingsFromIniFile() {
 
 void main() {
 	Logger.Write("main()", LogNormal);
-
-	GetSettingsFromIniFile();
-	Logger.SetLoggingLevel(logging_level);
-
-	InitialWaitForGame(1); // ehh... I don't even know if any additional wait time is necessary...
-	UglyHackForVehiclePersistenceScripts(seconds_to_wait_for_vehicle_persistence_scripts); // UGLY HACK FOR VEHICLE PERSISTENCE!
-	
 	CreateNotification("~r~Online Events Redux!~w~ v0.2", play_notification_beeps);
-
 	MissionHandler Handler;
 
 	while (true) {
+		WaitDuringDeathArrestOrLoading(1);
 		Update();
 		Handler.Update();
 		WAIT(0);
@@ -1099,7 +1051,16 @@ void main() {
 	Logger.Close(); // I don't think this will ever happen...
 }
 
+void init() {
+	Logger.Write("init()", LogNormal);
+	GetSettingsFromIniFile();
+	Logger.SetLoggingLevel(logging_level);
+	WaitDuringDeathArrestOrLoading(1); // TODO: decide how many additional seconds we must arbitrarily wait.
+	UglyHackForVehiclePersistenceScripts(seconds_to_wait_for_vehicle_persistence_scripts); // UGLY HACK FOR VEHICLE PERSISTENCE!
+}
+
 void ScriptMain() {
 	srand(GetTickCount());
+	init();
 	main();
 }

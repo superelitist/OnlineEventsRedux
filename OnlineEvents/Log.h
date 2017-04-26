@@ -5,13 +5,13 @@
 #include <fstream>
 #include <Windows.h>
 
-enum LogLevel { LogNone, // No Log.Write() should ever use this. This effectively turns logging off.
-				LogError, // Only things that should never have happened.
-				LogNormal, // Some informational things. Should get a couple lines a minute on this.
-				LogVerbose, // Some informational things that repeat a lot.
-				LogVeryVerbose, // Mostly to follow program flow, but spammy.
-				LogExtremelyVerbose // These will probably send a hundred times a second. This should almost always be off.
-};
+enum LogLevel { LogNone				= 0, // No Log.Write() should ever use this. This effectively turns logging off.
+				LogError			= 1, // Only things that should never have happened.
+				LogNormal			= 2, // Some informational things, usually will only log once. Should get a couple lines a minute on this.
+				LogVerbose			= 4, // Some informational things that repeat a lot.
+				LogVeryVerbose		= 8, // Mostly to follow program flow, but spammy.
+				LogExtremelyVerbose	= 16 // These will probably send a hundred times a second. This should almost always be off.
+}; // I could do bitwise eval, but there's not much point...
 
 class Log {
 public:
