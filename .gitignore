@@ -268,7 +268,4 @@ __pycache__/
 *.iobj
 *.asi
 
-*.vcxproj
-*.vcxproj.filters
-*.vcxproj.user
 *.rc

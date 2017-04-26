@@ -19,7 +19,6 @@
 #include "strings.h"
 #include <random>
 
-
 CIniReader Reader(".\\OnlineEvents.ini");
 Log Logger(".\\OnlineEvents.log", LogNormal);
 
