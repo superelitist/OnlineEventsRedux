@@ -50,11 +50,11 @@ uint seconds_to_wait_for_vehicle_persistence_scripts, number_of_tries_to_select_
 uint maximum_number_of_spawn_points, maximum_number_of_vehicle_models;
 
 // technically these could be added to the ini file pretty easily, but not by name - I'd have to include instructions...
-int default_stealable_vehicle_flags = SelectCompacts | SelectSedans | SelectSUVs | SelectCoupes |
-										SelectMuscle | SelectSportsClassics | SelectSports | SelectSuper |
-										SelectMotorcycles | SelectOffRoad;
+int default_stealable_vehicle_flags = Compact | Sedan | SUV | Coupe |
+										Muscle | SportsClassic | Sports | Super |
+										Motorcycle | OffRoad;
 
-int default_destroyable_vehicle_classes = SelectSUVs | SelectMuscle | SelectOffRoad | SelectMotorcycles;
+int default_destroyable_vehicle_classes = SUV | Muscle | OffRoad | Motorcycle;
 
 void NotifyBottomCenter(char* message) {
 	Logger.Write("NotifyBottomCenter()", LogExtremelyVerbose);
@@ -206,33 +206,33 @@ Hash GetHashOfVehicleModel(Vehicle vehicle) {
 	return ENTITY::GET_ENTITY_MODEL(vehicle);
 }
 
-int GetVehicleClassFromHash(Hash hash) {
+int GetVehicleClassBitwiseFromHash(Hash hash) {
 	Logger.Write("GetVehicleClassFromHash()", LogExtremelyVerbose);
 	int raw_int = VEHICLE::GET_VEHICLE_CLASS_FROM_NAME(hash);
 	Logger.Write("GetVehicleClassFromHash(): " + std::string(VehicleClasses[raw_int]), LogVerbose); // from strings.h because c++ sucks at some things.
 	switch (raw_int) {
-	case  0: return SelectCompacts;
-	case  1: return SelectSedans;
-	case  2: return SelectSUVs;
-	case  3: return SelectCoupes;
-	case  4: return SelectMuscle;
-	case  5: return SelectSportsClassics;
-	case  6: return SelectSports;
-	case  7: return SelectSuper;
-	case  8: return SelectMotorcycles;
-	case  9: return SelectOffRoad;
-	case 10: return SelectIndustrial;
-	case 11: return SelectUtility;
-	case 12: return SelectVans;
-	case 13: return SelectCycles;
-	case 14: return SelectBoats;
-	case 15: return SelectHelicopters;
-	case 16: return SelectPlanes;
-	case 17: return SelectService;
-	case 18: return SelectEmergency;
-	case 19: return SelectMilitary;
-	case 20: return SelectCommercial;
-	case 21: return SelectTrains;
+	case  0: return Compact;
+	case  1: return Sedan;
+	case  2: return SUV;
+	case  3: return Coupe;
+	case  4: return Muscle;
+	case  5: return SportsClassic;
+	case  6: return Sports;
+	case  7: return Super;
+	case  8: return Motorcycle;
+	case  9: return OffRoad;
+	case 10: return Industrial;
+	case 11: return Utility;
+	case 12: return Van;
+	case 13: return Cycle;
+	case 14: return Boat;
+	case 15: return Helicopter;
+	case 16: return Plane;
+	case 17: return Service;
+	case 18: return Emergency;
+	case 19: return Military;
+	case 20: return Commercial;
+	case 21: return Trainn;
 	}
 	return 0;
 }
@@ -409,7 +409,7 @@ Hash SelectAVehicleModel(std::vector<Hash> vector_of_hashes_to_search, uint vehi
 		char *this_vehicle_display_name = VEHICLE::GET_DISPLAY_NAME_FROM_VEHICLE_MODEL(vehicle_hash);
 		char *this_vehicle_string_literal = UI::_GET_LABEL_TEXT(this_vehicle_display_name);
 		Logger.Write("SelectAVehicleModel(): " + std::string(this_vehicle_string_literal) + "...?", LogVeryVerbose);
-		int vehicle_class = GetVehicleClassFromHash(vehicle_hash);
+		int vehicle_class = GetVehicleClassBitwiseFromHash(vehicle_hash);
 		if (vehicle_class_options & vehicle_class) {
 			Logger.Write("SelectAVehicleModel(): selected a model out of " + std::to_string(vector_of_hashes_to_search.size()) + " Hashes after " + std::to_string(i+1) + " tries ( " + std::string(this_vehicle_string_literal) + " )", LogVerbose);
 			return vehicle_hash;
@@ -799,12 +799,11 @@ MissionType StealVehicleMission::Prepare() {
 	drop_off_coordinates.x = 1226.06; drop_off_coordinates.y = -3231.36; drop_off_coordinates.z = 5.02;
 	Vector4 vehicle_spawn_position = SelectASpawnPoint(playerPed, vehicle_spawn_points, reserved_vehicle_spawn_points, spawn_point_maximum_range, spawn_point_minimum_range, number_of_tries_to_select_items);
 	if (vehicle_spawn_position.x == 0.0f && vehicle_spawn_position.y == 0.0f && vehicle_spawn_position.z == 0.0f && vehicle_spawn_position.h == 0.0f) return NO_Mission;
-	switch (GetFromUniformIntDistribution(1, 10)) {
-	
-	case 2: stealable_vehicle_flags = default_stealable_vehicle_flags & ~SelectSuper;					break;
-	case 3: stealable_vehicle_flags = default_stealable_vehicle_flags & ~(SelectSuper | SelectSports);	break;
-	default: stealable_vehicle_flags = default_stealable_vehicle_flags;									break;
-	}
+	stealable_vehicle_flags = default_stealable_vehicle_flags; // we want some sort of weighted distribution of cars to steal...
+	if (IsTheUniverseFavorable(0.6666)) stealable_vehicle_flags = stealable_vehicle_flags & ~Super; // disallow Supers 66% of the time.
+	if (IsTheUniverseFavorable(0.3333)) stealable_vehicle_flags = stealable_vehicle_flags & ~Sports; // disallow Sports 33% of the time.
+	if (IsTheUniverseFavorable(0.3333)) stealable_vehicle_flags = stealable_vehicle_flags & ~SportsClassic; // etc...
+	if (IsTheUniverseFavorable(0.3333)) stealable_vehicle_flags = stealable_vehicle_flags & ~OffRoad; // etc...
 	vehicle_hash_ = SelectAVehicleModel(possible_vehicle_models, stealable_vehicle_flags, number_of_tries_to_select_items);
 	if (vehicle_hash_ == NULL) return NO_Mission;
 	if (ENTITY::WOULD_ENTITY_BE_OCCLUDED(vehicle_hash_, vehicle_spawn_position.x, vehicle_spawn_position.y, vehicle_spawn_position.z, true)) return NO_Mission; // this doesn't always work (failed consistently testing against a stockade) but works enough, considering there's no GET_ENTITY_AT_COORDS
@@ -813,8 +812,8 @@ MissionType StealVehicleMission::Prepare() {
 	vehicle_to_steal_ = VEHICLE::CREATE_VEHICLE(vehicle_hash_, vehicle_spawn_position.x, vehicle_spawn_position.y, vehicle_spawn_position.z, vehicle_spawn_position.h, 0, 0);
 	VEHICLE::SET_VEHICLE_ON_GROUND_PROPERLY(vehicle_to_steal_);
 	//if (IsTheUniverseFavorable(1.0)) VEHICLE::SET_VEHICLE_IS_STOLEN(vehicle_to_steal_, true); // doesn't work.
-	if (IsTheUniverseFavorable(0.6666)) VEHICLE::SET_VEHICLE_DOORS_LOCKED(vehicle_to_steal_, 7);
-	if (IsTheUniverseFavorable(0.85)) VEHICLE::SET_VEHICLE_NEEDS_TO_BE_HOTWIRED(vehicle_to_steal_, true);
+	if (IsTheUniverseFavorable(0.6666)) VEHICLE::SET_VEHICLE_DOORS_LOCKED(vehicle_to_steal_, 7); 
+	if (IsTheUniverseFavorable(0.6666)) VEHICLE::SET_VEHICLE_NEEDS_TO_BE_HOTWIRED(vehicle_to_steal_, true);
 	vehicle_blip_ = UI::ADD_BLIP_FOR_ENTITY(vehicle_to_steal_);
 	if (use_default_blip) UI::SET_BLIP_SPRITE(vehicle_blip_, 1);
 	else if (VEHICLE::IS_THIS_MODEL_A_CAR(vehicle_hash_)) UI::SET_BLIP_SPRITE(vehicle_blip_, 225);
@@ -847,7 +846,7 @@ MissionType StealVehicleMission::Execute() {
 
 	if (mission_objective_ == GetCar) {
 		if (PED::IS_PED_IN_VEHICLE(playerPed, vehicle_to_steal_, 0)) {
-			if (GetVehicleClassFromHash(vehicle_hash_) == SelectSuper && IsTheUniverseFavorable(0.3333)) SetPlayerMinimumWantedLevel(Wanted_Three);
+			if (GetVehicleClassBitwiseFromHash(vehicle_hash_) == Super && IsTheUniverseFavorable(0.3333)) SetPlayerMinimumWantedLevel(Wanted_Three);
 			else if (IsTheUniverseFavorable(0.3333)) SetPlayerMinimumWantedLevel(Wanted_Two);
 			else if (IsTheUniverseFavorable(0.6666)) SetPlayerMinimumWantedLevel(Wanted_One);
 			CreateNotification("Respray the ~y~vehicle~w~ before turning it in.", play_notification_beeps);
@@ -857,8 +856,8 @@ MissionType StealVehicleMission::Execute() {
 	
 	if (mission_objective_ == ResprayCar) {
 		VEHICLE::GET_VEHICLE_COLOURS(vehicle_to_steal_, &vehicle_primary_color_compare_, &vehicle_secondary_color_compare_);
-		if (vehicle_primary_color_initial_ != vehicle_primary_color_compare_	&& ENTITY::GET_ENTITY_SPEED(vehicle_to_steal_) != 0 ||
-			vehicle_secondary_color_initial_ != vehicle_secondary_color_compare_	&& ENTITY::GET_ENTITY_SPEED(vehicle_to_steal_) != 0) {
+		if (vehicle_primary_color_initial_ != vehicle_primary_color_compare_ && ENTITY::GET_ENTITY_SPEED(vehicle_to_steal_) != 0 ||
+			vehicle_secondary_color_initial_ != vehicle_secondary_color_compare_ && ENTITY::GET_ENTITY_SPEED(vehicle_to_steal_) != 0) {
 			drop_off_blip_ = UI::ADD_BLIP_FOR_COORD(drop_off_coordinates.x, drop_off_coordinates.y, drop_off_coordinates.z);
 			if (use_default_blip == 0) UI::SET_BLIP_SPRITE(drop_off_blip_, 50);
 			else UI::SET_BLIP_SPRITE(drop_off_blip_, 1);
@@ -889,8 +888,34 @@ MissionType StealVehicleMission::Execute() {
 			while (ENTITY::GET_ENTITY_SPEED(vehicle_to_steal_) != 0) WAIT(0);
 			AI::TASK_LEAVE_VEHICLE(playerPed, vehicle_to_steal_, 0);
 			VEHICLE::SET_VEHICLE_UNDRIVEABLE(vehicle_to_steal_, 1);
-			if ((GetVehicleClassFromHash(vehicle_hash_) == SelectSuper)) ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(1,5)*20000);
-			else ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(1, 5) * 10000);
+			int reward_amount_by_class;
+			switch (GetVehicleClassBitwiseFromHash(vehicle_hash_)) {
+			case Compact: reward_amount_by_class = 1969; break; // derived from a combination of SP and Online values for Legendary Motorsports
+			case Sedan : reward_amount_by_class = 12200; break; // and Los Santos Customs. Probably not very accurate...
+			case SUV : reward_amount_by_class = 13578; break;
+			case Coupe : reward_amount_by_class = 20646; break;
+			case Muscle : reward_amount_by_class = 14036; break;
+			case SportsClassic : reward_amount_by_class = 92113; break;
+			case Sports : reward_amount_by_class = 26555; break;
+			case Super : reward_amount_by_class = 121232; break;
+			case Motorcycle : reward_amount_by_class = 34171; break;
+			case OffRoad : reward_amount_by_class = 10750; break;
+			//case Industrial : reward_amount_by_class = 0; break;
+			case Utility : reward_amount_by_class = 3500; break;
+			case Van : reward_amount_by_class = 1886; break;
+			//case Cycle : reward_amount_by_class = 0; break;
+			//case Boat : reward_amount_by_class = 0; break;
+			//case Helicopter : reward_amount_by_class = 0; break;
+			//case Plane : reward_amount_by_class = 0; break;
+			//case Service : reward_amount_by_class = 0; break;
+			//case Emergency : reward_amount_by_class = 0; break;
+			//case Military : reward_amount_by_class = 0; break;
+			//case Commercial : reward_amount_by_class = 0; break;
+			//case Train : reward_amount_by_class = 0; break;
+			default: reward_amount_by_class = 29386; break; // until I define values for non-default classes, this average of all values will fill in.
+			}
+			float reward_modifier = GetFromUniformRealDistribution(-0.5f, 1.5f); // you lose some, you win some more.
+			ChangeMoneyForCurrentPlayer(int(reward_amount_by_class * reward_modifier)); // who cares about rounding errors?
 			CreateNotification("The ~y~vehicle~w~ has been delivered.", play_notification_beeps);
 			UI::REMOVE_BLIP(&drop_off_blip_);
 			UI::REMOVE_BLIP(&vehicle_blip_);
@@ -1031,7 +1056,7 @@ void GetSettingsFromIniFile() {
 	seconds_to_wait_for_vehicle_persistence_scripts = Reader.ReadInteger("Debug", "seconds_to_wait_for_vehicle_persistence_scripts", 0);
 	number_of_tries_to_select_items = Reader.ReadInteger("Debug", "number_of_tries_to_select_items", 100);
 	vehicle_search_range_minimum = Reader.ReadInteger("Options", "vehicle_search_range_minimum", 30);
-	maximum_number_of_spawn_points = Reader.ReadInteger("Options", "maximum_number_of_spawn_points", 10000);
+	maximum_number_of_spawn_points = Reader.ReadInteger("Options", "maximum_number_of_spawn_points", 20000);
 	maximum_number_of_vehicle_models = Reader.ReadInteger("Options", "maximum_number_of_vehicle_models", 1000);
 	return;
 }

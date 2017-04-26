@@ -22,29 +22,32 @@ typedef struct { float x = 0; DWORD _paddingx; float y = 0; DWORD _paddingy; flo
 
 enum MissionType { StealVehicle, DestroyVehicle, Assassination, ArmoredTruck, CrateDrop, MAX_Mission, NO_Mission };
 enum WantedLevel { Wanted_Zero, Wanted_One, Wanted_Two, Wanted_Three, Wanted_Four, Wanted_Five };
-enum VehiclesToSelect {
-	SelectCompacts = 0x000001,
-	SelectSedans = 0x000002,
-	SelectSUVs = 0x000004,
-	SelectCoupes = 0x000008,
-	SelectMuscle = 0x000010,
-	SelectSportsClassics = 0x000020,
-	SelectSports = 0x000040,
-	SelectSuper = 0x000080,
-	SelectMotorcycles = 0x000100,
-	SelectOffRoad = 0x000200,
-	SelectIndustrial = 0x000400,
-	SelectUtility = 0x000800,
-	SelectVans = 0x001000,
-	SelectCycles = 0x002000,
-	SelectBoats = 0x004000,
-	SelectHelicopters = 0x008000,
-	SelectPlanes = 0x010000,
-	SelectService = 0x020000,
-	SelectEmergency = 0x040000,
-	SelectMilitary = 0x080000,
-	SelectCommercial = 0x100000,
-	SelectTrains = 0x200000,
+enum VehicleClassBitwise {
+	Compact = 0x000001,
+	Sedan = 0x000002,
+	SUV = 0x000004,
+	Coupe = 0x000008,
+	Muscle = 0x000010,
+	SportsClassic = 0x000020,
+	Sports = 0x000040,
+	Super = 0x000080,
+	Motorcycle = 0x000100,
+	OffRoad = 0x000200,
+	Industrial = 0x000400,
+	Utility = 0x000800,
+	Van = 0x001000,
+	Cycle = 0x002000,
+	Boat = 0x004000,
+	Helicopter = 0x008000,
+	Plane = 0x010000,
+	Service = 0x020000,
+	Emergency = 0x040000,
+	Military = 0x080000,
+	Commercial = 0x100000,
+	Trainn = 0x200000, // Train is a typedef...
+};
+enum VehicleClassValues {
+	
 };
 
 static char *VehicleClasses[] =
