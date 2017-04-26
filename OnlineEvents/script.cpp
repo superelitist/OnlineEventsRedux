@@ -43,18 +43,14 @@ bool play_notification_beeps, use_default_blip;
 uint mission_cooldown, mission_timeout;
 uint spawn_point_minimum_range, spawn_point_maximum_range;
 uint mission_minimum_range_for_timeout;
+float mission_reward_modifier;
+int stealable_vehicle_classes;
+int destroyable_vehicle_classes;
 
 // debug options
 LogLevel logging_level;
 uint seconds_to_wait_for_vehicle_persistence_scripts, number_of_tries_to_select_items, vehicle_search_range_minimum;
 uint maximum_number_of_spawn_points, maximum_number_of_vehicle_models;
-
-// technically these could be added to the ini file pretty easily, but not by name - I'd have to include instructions...
-int default_stealable_vehicle_flags = Compact | Sedan | SUV | Coupe |
-										Muscle | SportsClassic | Sports | Super |
-										Motorcycle | OffRoad;
-
-int default_destroyable_vehicle_classes = SUV | Muscle | OffRoad | Motorcycle;
 
 void NotifyBottomCenter(char* message) {
 	Logger.Write("NotifyBottomCenter()", LogExtremelyVerbose);
@@ -187,7 +183,8 @@ bool IsTheUniverseFavorable(float probability) {
 //	STATS::STAT_SET_INT(hash, val, 1);
 //}
 
-void ChangeMoneyForCurrentPlayer(int value) {
+void ChangeMoneyForCurrentPlayer(int value, float modifier) {
+	value = int(value * modifier);
 	int current_player;
 	int player_cash;
 	if (PED::IS_PED_MODEL(playerPed, GAMEPLAY::GET_HASH_KEY("player_zero"))) current_player = 0;
@@ -545,9 +542,9 @@ MissionType CrateDropMission::Execute() {
 			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_6_);
 			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_7_);
 			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_8_);
-			ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(50000, 150000));
+			ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(50000, 150000), mission_reward_modifier);
 		}
-		else ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(25000, 75000));
+		else ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(25000, 75000), mission_reward_modifier);
 		CreateNotification("The drop was acquired.", play_notification_beeps);
 		return NO_Mission;
 	}
@@ -631,15 +628,15 @@ MissionType ArmoredTruckMission::Execute() {
 		switch (random) { // falls through!
 		case 0:
 			SetPlayerMinimumWantedLevel(Wanted_Three);
-			case3 = OBJECT::CREATE_AMBIENT_PICKUP(0xDE78F17E, behind_truck.x, behind_truck.y, behind_truck.z + 1, -1, GetFromUniformIntDistribution(5, 25) * 1000, 0, 1, 1);
+			case3 = OBJECT::CREATE_AMBIENT_PICKUP(0xDE78F17E, behind_truck.x, behind_truck.y, behind_truck.z + 1, -1, GetFromUniformIntDistribution(5, 25) * 1000 * mission_reward_modifier, 0, 1, 1);
 			ENTITY::SET_OBJECT_AS_NO_LONGER_NEEDED(&case3);
 		case 1:
 			SetPlayerMinimumWantedLevel(Wanted_Two);
-			case2 = OBJECT::CREATE_AMBIENT_PICKUP(0xDE78F17E, behind_truck.x, behind_truck.y, behind_truck.z + 1, -1, GetFromUniformIntDistribution(5, 25) * 1000 , 0, 1, 1);
+			case2 = OBJECT::CREATE_AMBIENT_PICKUP(0xDE78F17E, behind_truck.x, behind_truck.y, behind_truck.z + 1, -1, GetFromUniformIntDistribution(5, 25) * 1000 * mission_reward_modifier, 0, 1, 1);
 			ENTITY::SET_OBJECT_AS_NO_LONGER_NEEDED(&case2);
 		case 2:
 			SetPlayerMinimumWantedLevel(Wanted_One);
-			case1 = OBJECT::CREATE_AMBIENT_PICKUP(0xDE78F17E, behind_truck.x, behind_truck.y, behind_truck.z + 1, -1, GetFromUniformIntDistribution(5, 25) * 1000, 0, 1, 1);
+			case1 = OBJECT::CREATE_AMBIENT_PICKUP(0xDE78F17E, behind_truck.x, behind_truck.y, behind_truck.z + 1, -1, GetFromUniformIntDistribution(5, 25) * 1000 * mission_reward_modifier, 0, 1, 1);
 			ENTITY::SET_OBJECT_AS_NO_LONGER_NEEDED(&case1);
 		}
 		CreateNotification("The ~b~armored truck's~w~ doors have been opened. Cash has been dropped.", play_notification_beeps);
@@ -698,7 +695,7 @@ MissionType AssassinationMission::Execute() {
 	if (ENTITY::IS_ENTITY_DEAD(assassination_target_)) {
 		UI::REMOVE_BLIP(&target_blip_);
 		ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&assassination_target_);
-		ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(5, 25) * 1000);
+		ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(5, 25) * 1000, mission_reward_modifier);
 		CreateNotification("The ~r~target~w~ has been eliminated.", play_notification_beeps);
 		return NO_Mission;
 	}
@@ -733,7 +730,7 @@ MissionType DestroyVehicleMission::Prepare() {
 	Logger.Write("DestroyVehicleMission::Prepare()", LogVerbose);
 	Vector4 vehicle_spawn_position = SelectASpawnPoint(playerPed, vehicle_spawn_points, reserved_vehicle_spawn_points, spawn_point_maximum_range, spawn_point_minimum_range, number_of_tries_to_select_items);
 	if (vehicle_spawn_position.x == 0.0f && vehicle_spawn_position.y == 0.0f && vehicle_spawn_position.z == 0.0f && vehicle_spawn_position.h == 0.0f) return NO_Mission;
-	Hash vehicle_hash = SelectAVehicleModel(possible_vehicle_models, default_destroyable_vehicle_classes, number_of_tries_to_select_items);
+	Hash vehicle_hash = SelectAVehicleModel(possible_vehicle_models, destroyable_vehicle_classes, number_of_tries_to_select_items);
 	if (vehicle_hash == NULL) return NO_Mission;
 	STREAMING::REQUEST_MODEL(vehicle_hash);
 	while (!STREAMING::HAS_MODEL_LOADED(vehicle_hash)) WAIT(0);
@@ -754,7 +751,7 @@ MissionType DestroyVehicleMission::Execute() {
 	if (!VEHICLE::IS_VEHICLE_DRIVEABLE(vehicle_to_destroy_, 1)) {
 		UI::REMOVE_BLIP(&vehicle_blip_);
 		ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&vehicle_to_destroy_);
-		ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(5, 25) * 1000);
+		ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(5, 25) * 1000, mission_reward_modifier);
 		CreateNotification("~r~Vehicle~w~ destroyed.", play_notification_beeps);
 		return NO_Mission;
 	}
@@ -799,7 +796,7 @@ MissionType StealVehicleMission::Prepare() {
 	drop_off_coordinates.x = 1226.06; drop_off_coordinates.y = -3231.36; drop_off_coordinates.z = 5.02;
 	Vector4 vehicle_spawn_position = SelectASpawnPoint(playerPed, vehicle_spawn_points, reserved_vehicle_spawn_points, spawn_point_maximum_range, spawn_point_minimum_range, number_of_tries_to_select_items);
 	if (vehicle_spawn_position.x == 0.0f && vehicle_spawn_position.y == 0.0f && vehicle_spawn_position.z == 0.0f && vehicle_spawn_position.h == 0.0f) return NO_Mission;
-	stealable_vehicle_flags = default_stealable_vehicle_flags; // we want some sort of weighted distribution of cars to steal...
+	stealable_vehicle_flags = stealable_vehicle_classes; // we want some sort of weighted distribution of cars to steal...
 	if (IsTheUniverseFavorable(0.6666)) stealable_vehicle_flags = stealable_vehicle_flags & ~Super; // disallow Supers 66% of the time.
 	if (IsTheUniverseFavorable(0.3333)) stealable_vehicle_flags = stealable_vehicle_flags & ~Sports; // disallow Sports 33% of the time.
 	if (IsTheUniverseFavorable(0.3333)) stealable_vehicle_flags = stealable_vehicle_flags & ~SportsClassic; // etc...
@@ -915,7 +912,7 @@ MissionType StealVehicleMission::Execute() {
 			default: reward_amount_by_class = 29386; break; // until I define values for non-default classes, this average of all values will fill in.
 			}
 			float reward_modifier = GetFromUniformRealDistribution(-0.5f, 1.5f); // you lose some, you win some more.
-			ChangeMoneyForCurrentPlayer(int(reward_amount_by_class * reward_modifier)); // who cares about rounding errors?
+			ChangeMoneyForCurrentPlayer(int(reward_amount_by_class * reward_modifier), mission_reward_modifier); // who cares about rounding errors?
 			CreateNotification("The ~y~vehicle~w~ has been delivered.", play_notification_beeps);
 			UI::REMOVE_BLIP(&drop_off_blip_);
 			UI::REMOVE_BLIP(&vehicle_blip_);
@@ -1051,19 +1048,22 @@ void GetSettingsFromIniFile() {
 	spawn_point_minimum_range = Reader.ReadInteger("Options", "spawn_point_minimum_range", 1000);
 	spawn_point_maximum_range = Reader.ReadInteger("Options", "spawn_point_maximum_range", 3000);
 	mission_minimum_range_for_timeout = Reader.ReadInteger("Options", "mission_minimum_range_for_timeout", 333);
+	mission_reward_modifier = Reader.ReadFloat("Options", "mission_reward_modifier", 1.0f);
+	stealable_vehicle_classes = Reader.ReadInteger("Options", "stealable_vehicle_flags", Compact | Sedan | SUV | Coupe | Muscle | SportsClassic | Sports | Super | Motorcycle | OffRoad);
+	destroyable_vehicle_classes = Reader.ReadInteger("Options", "destroyable_vehicle_flags", SUV | Muscle | OffRoad | Motorcycle);
 	// DEBUG
 	logging_level = LogLevel (std::max(Reader.ReadInteger("Debug", "logging_level", 1), 1)); // right now at least, I don't want to let anyone turn logging entirely off.
 	seconds_to_wait_for_vehicle_persistence_scripts = Reader.ReadInteger("Debug", "seconds_to_wait_for_vehicle_persistence_scripts", 0);
 	number_of_tries_to_select_items = Reader.ReadInteger("Debug", "number_of_tries_to_select_items", 100);
-	vehicle_search_range_minimum = Reader.ReadInteger("Options", "vehicle_search_range_minimum", 30);
-	maximum_number_of_spawn_points = Reader.ReadInteger("Options", "maximum_number_of_spawn_points", 20000);
-	maximum_number_of_vehicle_models = Reader.ReadInteger("Options", "maximum_number_of_vehicle_models", 1000);
+	vehicle_search_range_minimum = Reader.ReadInteger("Debug", "vehicle_search_range_minimum", 30);
+	maximum_number_of_spawn_points = Reader.ReadInteger("Debug", "maximum_number_of_spawn_points", 20000);
+	maximum_number_of_vehicle_models = Reader.ReadInteger("Debug", "maximum_number_of_vehicle_models", 1000);
 	return;
 }
 
 void main() {
 	Logger.Write("main()", LogNormal);
-	CreateNotification("~r~Online Events Redux!~w~ v0.2", play_notification_beeps);
+	CreateNotification("~r~Online Events Redux!~w~ v1.0", play_notification_beeps);
 	MissionHandler Handler;
 
 	while (true) {
