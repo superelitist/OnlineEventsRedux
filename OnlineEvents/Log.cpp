@@ -19,11 +19,11 @@ void Log::SetLoggingLevel(LogLevel logging_level) {
 
 void Log::Write(std::string string, LogLevel level) {
 	if (file_object_.is_open()) {
-		//if (level <= logging_level_) {
-		if (logging_level_ & level) {
+		if (level <= logging_level_) {
+		//if (logging_level_ & level) {
 			log_time_delta_ = GetTickCount64() - log_time_last_;
 			log_time_last_ = GetTickCount64();
-			file_object_ << log_time_delta_ << "	" << string << std::endl;
+			file_object_ << log_time_delta_ << "	" << level << "	" << string << std::endl;
 		}
 	}
 }
