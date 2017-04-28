@@ -18,7 +18,15 @@
 
 static constexpr auto radian = M_PI / 180;
 
-typedef struct { float x = 0; DWORD _paddingx; float y = 0; DWORD _paddingy; float z = 0; DWORD _paddingz; float h = 0; DWORD _paddingw; } Vector4;
+struct Vector4 {
+	Vector4() {};
+	Vector4(float x, float y, float z, float h) : x(x), y(y), z(z), h(h) {}
+	Vector4(Vector3 v3, float h) : x(v3.x), y(v3.y), z(v3.z), h(h) {}
+	float x = 0.0;
+	float y = 0.0;
+	float z = 0.0;
+	float h = 0.0;
+} ;
 
 enum MissionType { StealVehicle, DestroyVehicle, Assassination, ArmoredTruck, CrateDrop, MAX_Mission, NO_Mission };
 enum WantedLevel { Wanted_Zero, Wanted_One, Wanted_Two, Wanted_Three, Wanted_Four, Wanted_Five };

@@ -80,15 +80,15 @@ double Radians(double degrees) {
 
 Vector4 GetVector4OfEntity(Entity entity) {
 	Logger.Write("GetVector4OfEntity():", LogExtremelyVerbose);
-	Vector3 v3 = ENTITY::GET_ENTITY_COORDS(entity, 0);
-	Vector4 v4; v4.x = v3.x, v4.y = v3.y, v4.z = v3.z, v4.h = ENTITY::_GET_ENTITY_PHYSICS_HEADING(entity);
-	return v4;
+	return Vector4 { ENTITY::GET_ENTITY_COORDS(entity, 0), ENTITY::_GET_ENTITY_PHYSICS_HEADING(entity) };
 }
 
 Vector3 GetCoordinateByOriginBearingAndDistance(Vector4 v4, float bearing, float distance) {
 	Logger.Write("GetCoordinatesByOriginBearingAndDistance():", LogExtremelyVerbose);
-	Vector3 v3;	v3.x = v4.x + cos(Radians(bearing)) * distance; v3.y = v4.y + sin((bearing)*radian) * distance; v3.z = v4.z;
-	return v3;
+	Vector3 v3;	v3.x = v4.x + cos((bearing)*radian) * distance; v3.y = v4.y + sin((bearing)*radian) * distance; v3.z = v4.z;
+	//return v3;
+	return Vector3{ static_cast<float>(v4.x + cos((bearing)*radian) * distance), 0 , static_cast<float>(v4.y + sin((bearing)*radian) * distance), 0, static_cast<float>(v4.z), 0 };
+	//return Vector3{ 2, 3, 4 };
 }
 
 double GetAngleBetween2DCoords(float ax, float ay, float bx, float by) {
@@ -258,19 +258,14 @@ std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vector4> ve
 		for (int i = 0; i < count; i++) {
 			if (DoesEntityExistAndIsNotNull(all_world_vehicles[i])) {
 				Vehicle this_vehicle = all_world_vehicles[i];
-				Vector3 this_vehicle_coordinates = ENTITY::GET_ENTITY_COORDS(this_vehicle, 0);
-				Vector4 this_vehicle_position;
-				this_vehicle_position.x = this_vehicle_coordinates.x;
-				this_vehicle_position.y = this_vehicle_coordinates.y;
-				this_vehicle_position.z = this_vehicle_coordinates.z;
-				this_vehicle_position.h = ENTITY::GET_ENTITY_HEADING(this_vehicle);
+				Vector4 this_vehicle_position = { ENTITY::GET_ENTITY_COORDS(this_vehicle, 0), ENTITY::GET_ENTITY_HEADING(this_vehicle) };
 				if (DoesEntityExistAndIsNotNull(this_vehicle) &&
 					IsVehicleDrivable(this_vehicle) && // is the vehicle a car/bike/etc and can the player start driving it?
 					IsVehicleProbablyParked(this_vehicle) && // not moving, no driver?
 					!(VEHICLE::GET_LAST_PED_IN_VEHICLE_SEAT(this_vehicle, -1)) && // probably not previously used by the player? We can hope?
 					!(VEHICLE::_IS_VEHICLE_DAMAGED(this_vehicle)) && // probably not an empty car in the street as a result of a pileup...
 					(VEHICLE::_IS_VEHICLE_SHOP_RESPRAY_ALLOWED(this_vehicle)) && // this doesn't seem to work...
-					GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, this_vehicle_coordinates.x, this_vehicle_coordinates.y, this_vehicle_coordinates.z, 0) > search_range_minimum
+					GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, this_vehicle_position.x, this_vehicle_position.y, this_vehicle_position.z, 0) > search_range_minimum
 					) {
 					// CHECK WHETHER THERE IS A BLIP AT THIS POSITION
 					// CHECK WHETHER THERE IS A BLIP AT THIS POSITION
@@ -970,7 +965,6 @@ void WaitDuringDeathArrestOrLoading(uint seconds) {
 		WAIT(seconds * 1000);
 		Logger.Write("PauseDuringDeathArrestOrLoading(): Returning to game.", LogNormal);
 	}
-
 	if (PLAYER::IS_PLAYER_BEING_ARRESTED(PLAYER::PLAYER_ID(), TRUE)) {
 		Logger.Write("PauseDuringDeathArrestOrLoading(): Player is Busted, waiting for player...", LogNormal);
 		while (PLAYER::IS_PLAYER_BEING_ARRESTED(PLAYER::PLAYER_ID(), TRUE)) WAIT(0);
@@ -1031,20 +1025,25 @@ int LogLocationAndGroundZ(int timer) {
 	return GetTickCount64();
 }
 
+void init() {
+	Logger.Write("init()", LogNormal);
+	GetSettingsFromIniFile();
+	Logger.SetLoggingLevel(logging_level);
+	WaitDuringDeathArrestOrLoading(1); // TODO: decide how many additional seconds we must arbitrarily wait.
+	UglyHackForVehiclePersistenceScripts(seconds_to_wait_for_vehicle_persistence_scripts); // UGLY HACK FOR VEHICLE PERSISTENCE!
+}
 
-void main() {
-	Logger.Write("main()", LogNormal);
+void ScriptMain() {
+	Logger.Write("ScriptMain()", LogNormal);
+	
+	srand(GetTickCount64());
+	
+	init();
+	
 	CreateNotification("~r~Online Events Redux!~w~ v1.0", play_notification_beeps);
 	MissionHandler Handler;
 
 	int timer = GetTickCount64();
-	//Blip origin_blip = UI::ADD_BLIP_FOR_COORD(ENTITY::GET_ENTITY_COORDS(PLAYER::PLAYER_PED_ID(), 0).x, ENTITY::GET_ENTITY_COORDS(PLAYER::PLAYER_PED_ID(), 0).y, ENTITY::GET_ENTITY_COORDS(PLAYER::PLAYER_PED_ID(), 0).z);
-	//Blip origin_blip = UI::ADD_BLIP_FOR_COORD(0, 0, 0);
-	//UI::SET_BLIP_SPRITE(origin_blip, 1);
-	//UI::SET_BLIP_COLOUR(origin_blip, 66);
-	//UI::SET_BLIP_SCALE(origin_blip, 0.5);
-	//Ped origin = PED::CREATE_PED(26, GAMEPLAY::GET_HASH_KEY("mp_g_m_pros_01"), 0, 0, 71.0, 40, false, true);
-	//AI::TASK_TURN_PED_TO_FACE_COORD(origin, 0, 1, 0, 120000);
 
 	while (true) {
 		GRAPHICS::DRAW_MARKER(1, 0, 0, 71.0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 204, 204, 204, 100, false, false, 2, false, false, false, false); // redraws every frame, no need to remove later
@@ -1058,18 +1057,4 @@ void main() {
 	}
 
 	Logger.Close(); // I don't think this will ever happen...
-}
-
-void init() {
-	Logger.Write("init()", LogNormal);
-	GetSettingsFromIniFile();
-	Logger.SetLoggingLevel(logging_level);
-	WaitDuringDeathArrestOrLoading(1); // TODO: decide how many additional seconds we must arbitrarily wait.
-	UglyHackForVehiclePersistenceScripts(seconds_to_wait_for_vehicle_persistence_scripts); // UGLY HACK FOR VEHICLE PERSISTENCE!
-}
-
-void ScriptMain() {
-	srand(GetTickCount64());
-	init();
-	main();
 }

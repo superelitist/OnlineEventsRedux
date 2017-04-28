@@ -3,7 +3,7 @@
 #include <string>
 #include <Windows.h>
 #include <chrono>
-#include <thread>
+//#include <thread>
 
 Log::Log(std::string filename, LogLevel logging_level) {
 	log_time_last_ = GetTickCount64();
