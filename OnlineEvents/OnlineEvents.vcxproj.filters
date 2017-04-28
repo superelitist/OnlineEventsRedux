@@ -39,10 +39,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="LICENSE.TXT" />
-    <Text Include="readme.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <None Include="OnlineEvents.ini" />
   </ItemGroup>
 </Project>
