@@ -534,6 +534,9 @@ MissionType ArmoredTruckMission::Prepare() {
 	while (!STREAMING::HAS_MODEL_LOADED(GAMEPLAY::GET_HASH_KEY("mp_s_m_armoured_01"))) WAIT(0);
 	truck_driver_ = PED::CREATE_PED_INSIDE_VEHICLE(armored_truck_, 26, GAMEPLAY::GET_HASH_KEY("mp_s_m_armoured_01"), -1, false, false);
 	if (IsTheUniverseFavorable(0.5)) truck_passenger_ = PED::CREATE_PED_INSIDE_VEHICLE(armored_truck_, 26, GAMEPLAY::GET_HASH_KEY("mp_s_m_armoured_01"), 0, false, false);
+	//int door_lock_num = GetFromUniformIntDistribution(1, 6);
+	//Logger.Write("door_lock_num:" + std::to_string(door_lock_num), LogNormal);
+	VEHICLE::SET_VEHICLE_DOORS_LOCKED(armored_truck_, 2);
 	if (ENTITY::DOES_ENTITY_EXIST(truck_driver_)) AI::TASK_VEHICLE_DRIVE_WANDER(truck_driver_, armored_truck_, 10.0f, 153);
 	truck_blip_ = UI::ADD_BLIP_FOR_ENTITY(armored_truck_);
 	if (use_default_blip) UI::SET_BLIP_SPRITE(truck_blip_, 1);
@@ -554,23 +557,28 @@ MissionType ArmoredTruckMission::Execute() {
 		ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&armored_truck_);
 		return NO_Mission;
 	}
+	if (PED::IS_PED_FATALLY_INJURED(truck_driver_) || !PED::IS_PED_IN_VEHICLE(truck_driver_, armored_truck_, 0)) {
+		VEHICLE::SET_VEHICLE_DOORS_LOCKED(armored_truck_, 7);
+	}
 	if (PED::IS_PED_IN_VEHICLE(playerPed, armored_truck_, 0)) {
 		WAIT(500);
-		VEHICLE::SET_VEHICLE_DOOR_OPEN(armored_truck_, 6, true, true); // maybe these?
-		VEHICLE::SET_VEHICLE_DOOR_OPEN(armored_truck_, 7, true, true);
+		VEHICLE::SET_VEHICLE_DOOR_OPEN(armored_truck_, 3, true, true); // maybe these?
+		VEHICLE::SET_VEHICLE_DOOR_OPEN(armored_truck_, 2, true, true);
+		//VEHICLE::SET_VEHICLE_DOOR_OPEN(armored_truck_, 6, true, true); // maybe these?
+		//VEHICLE::SET_VEHICLE_DOOR_OPEN(armored_truck_, 7, true, true);
 	}
 	if (VEHICLE::IS_VEHICLE_DOOR_FULLY_OPEN(armored_truck_, 2) || VEHICLE::IS_VEHICLE_DOOR_FULLY_OPEN(armored_truck_, 3)) {
 		Pickup case1; Pickup case2; Pickup case3;
-		Vector3 behind_truck = GetCoordinateByOriginBearingAndDistance(truck_position, 180, 2.5f);
+		Vector3 behind_truck = GetCoordinateByOriginBearingAndDistance(truck_position, truck_position.h+270, 3.33f);
 		int random = rand() % 3;
 		switch (random) { // falls through!
 		case 0:
 			SetPlayerMinimumWantedLevel(Wanted_Three);
-			case3 = OBJECT::CREATE_AMBIENT_PICKUP(0xDE78F17E, behind_truck.x, behind_truck.y, behind_truck.z + 1, -1, GetFromUniformIntDistribution(5, 25) * 1000 * mission_reward_modifier, 0, 1, 1);
+			case3 = OBJECT::CREATE_AMBIENT_PICKUP(0xDE78F17E, behind_truck.x-0.25, behind_truck.y-0.25, behind_truck.z + 1, -1, GetFromUniformIntDistribution(5, 25) * 1000 * mission_reward_modifier, 0, 1, 1);
 			ENTITY::SET_OBJECT_AS_NO_LONGER_NEEDED(&case3);
 		case 1:
 			SetPlayerMinimumWantedLevel(Wanted_Two);
-			case2 = OBJECT::CREATE_AMBIENT_PICKUP(0xDE78F17E, behind_truck.x, behind_truck.y, behind_truck.z + 1, -1, GetFromUniformIntDistribution(5, 25) * 1000 * mission_reward_modifier, 0, 1, 1);
+			case2 = OBJECT::CREATE_AMBIENT_PICKUP(0xDE78F17E, behind_truck.x+0.25, behind_truck.y+0.25, behind_truck.z + 1, -1, GetFromUniformIntDistribution(5, 25) * 1000 * mission_reward_modifier, 0, 1, 1);
 			ENTITY::SET_OBJECT_AS_NO_LONGER_NEEDED(&case2);
 		case 2:
 			SetPlayerMinimumWantedLevel(Wanted_One);

@@ -1,23 +1,23 @@
-TL;DR: events randomly occur on a timer, do the thing to get money. Also, this mod may set you or your computer on fire, and I won't care or help.
+**TL;DR: events randomly occur on a timer, do the thing to get money. Also, this mod may set you or your computer on fire, and I won't care or help.**
 
 
-CONTENTS OF THIS FILE         HASH
+CONTENTS OF THIS DOCUMENT
 ----------------------------------
 
- * Introduction 		[ed318fdc]
- * Disclaimer			[675ec68c]
- * License				[98d5cd85]
- * Requirements 		[688f7a52]
- * Installation			[048bb149]
- * Configuration		[169cee22]
- * Known Issues			[ea67c94d]
- * Ideas/Todos			[f520915b]
- * FAQ					[7e583746]
- * Changelog			[4ab3a4a2]
- * Credits				[8eaae8e2]
+ * [Introduction](#INTRODUCTION)
+ * [Disclaimer](#DISCLAIMER)
+ * [License](#License)
+ * [Requirements](#Requirements)
+ * [Installation](#Installation)
+ * [Configuration](#Configuration)
+ * [Known Issues](#Known-Issues)
+ * [Ideas/Todos](#Ideas/Todos)
+ * [FAQ](#FAQ)
+ * [Changelog](#Changelog)
+ * [Credits](#Credits)
 
 
-[ed318fdc] INTRODUCTION
+INTRODUCTION
 -----------------------
 
 Online Events Redux is a complete rewrite of Plastic Tangerine's excellent 'Online Random Events for Single Player v1.2' (https://www.gta5-mods.com/scripts/online-random-events-for-single-player). I had a couple nitpicks with the implementation however, and since the source was provided, I decided to finally learn some C++ and get my feet wet modding GTA. Holy cow C++ sucks. Of course now, after dozens of hours of coding, I see that I could have been using C# the whole time, but you know what? C# looks like it's for hipsters. It looks like the kind of language you can only code on a MacBook, sitting at a bare wooden table, with a mason jar of iced coffee in arm's reach. But I digress.
@@ -33,42 +33,42 @@ The original concept of the mod is more or less the same. There are five mission
 I think they're pretty self-explanatory. If you ignore the event (or take too long), the mission will time out (unless you're relatively close). There is also a cooldown period after each mission. On completion, you will get a lot of money (compared to vanilla events). Almost all of these values can be modified.
 
 
-[675ec68c] DISCLAIMER
+DISCLAIMER
 ---------------------
 
 This product is meant for educational purposes only. Any resemblance to real persons, living or dead is purely coincidental. Void where prohibited. Some assembly required. List each check separately by bank number. Batteries not included. Contents may settle during shipment. Use only as directed. No other warranty expressed or implied. Do not use while operating a motor vehicle or heavy equipment. Postage will be paid by addressee. Subject to CAB approval. This is not an offer to sell securities. Apply only to affected area. May be too intense for some viewers. Do not stamp. Use other side for additional listings. For recreational use only. Do not disturb. All models over 18 years of age. If condition persists, consult your physician. No user-serviceable parts inside. Freshest if eaten before date on carton. Subject to change without notice. Times approximate. Simulated picture. No postage necessary if mailed in the United States. Please remain seated until the ride has come to a complete stop. Breaking seal constitutes acceptance of agreement. For off-road use only. As seen on TV. One size fits all. Many suitcases look alike. Contains a substantial amount of non-tobacco ingredients. Colors may, in time, fade. We have sent the forms which seem right for you. Slippery when wet. For office use only. Not affiliated with the American Red Cross. Drop in any mailbox. Edited for television. Keep cool; process promptly. Post office will not deliver without postage. List was current at time of printing. Return to sender, no forwarding order on file, unable to forward. Not responsible for direct, indirect, incidental or consequential damages resulting from any defect, error or failure to perform. At participating locations only. Not the Beatles. Penalty for private use. See label for sequence. Substantial penalty for early withdrawal. Do not write below this line. Falling rock. Lost ticket pays maximum rate. Nap was here. Your canceled check is your receipt. Add toner. Place stamp here. Avoid contact with skin. Sanitized for your protection. Be sure each item is properly endorsed. Sign here without admitting guilt. Slightly higher west of the Mississippi. Employees and their families are not eligible. Beware of dog. Contestants have been briefed on some questions before the show. Limited time offer, call now to ensure prompt delivery. You must be present to win. No passes accepted for this engagement. No purchase necessary. Processed at location stamped in code at top of carton. Shading within a garment may occur. Use only in a well-ventilated area. Keep away from fire or flames. Replace with same type. Approved for veterans. Booths for two or more. Check here if tax deductible. Some equipment shown is optional. Price does not include taxes. No Canadian coins. Not recommended for children. Prerecorded for this time zone. Reproduction strictly prohibited. No solicitors. No alcohol, dogs or horses. No anchovies unless otherwise specified. Restaurant package, not for resale. List at least two alternate dates. First pull up, then pull down. Call toll free number before digging. Driver does not carry cash. Some of the trademarks mentioned in this product appear for identification purposes only. Objects in mirror may be closer than they appear. Record additional transactions on back of previous stub. Unix is a registered trademark of AT&T. Do not fold, spindle or mutilate. No transfers issued until the bus comes to a complete stop. Package sold by weight, not volume. Your mileage may vary. If the flow controls supplied are not installed, this unit will not operate properly. Keep out of reach of children. When this set is used with other equipment, if the picture is not stable or the buzz sound is heard, try to change the mutual position of relevant equipment or take enough distance between them. This unit not labeled for retail sale. Phenylketonurics: may contain phenylalanine. Close cover before striking. Mind the gap. No merchantability expressed or implied. Parental discretion is advised. Sold as a novelty item only. Although robust enough for general use, adventures into the esoteric periphery may reveal unexpected quirks. Not available in stores. May cause abdominal cramping and loose stools. Vitamins A, D, E, and K may have been added. Not designed or intended for use in on-line control of aircraft, air traffic, aircraft navigation or aircraft communications; or in the design, construction, operation or maintenance of any nuclear facility. Container may explode if heated. May contain traces of various nuts and seeds.
 
-This supersedes all previous notices. (credit: idiot-dog.com/disclaimer)
+This supersedes all previous notices. *(credit: idiot-dog.com/disclaimer)*
 
-No but seriously, if you use this and something goes sideways, refer to the LICENSE.TXT, specifically the part in all caps where it says I won't help you.
+No but seriously, if you use this and something goes sideways, refer to the [LICENSE.TXT](LICENSE.TXT), specifically the part in all caps where it says I won't help you.
 
 
-[98d5cd85] LICENSE
+LICENSE
 ------------------
 
 Plastic Tangerine included this on their mod page: "You may modify, and use code from this program without my permission. I feel providing source code allows the modding community to grow. You may re-upload this without my permission on any other site but this one. I only request that you credit me when you do."
 
-I've almost completely rewritten the code. It bears virtually no resemblance to the original. Although the original license appears to be attribution-only, I suspect that they would feel it fair for me to license its derivative under the MIT license. Thus, please refer to LICENSE.TXT.
+I've almost completely rewritten the code. It bears virtually no resemblance to the original. Although the original license appears to be attribution-only, I suspect that they would feel it fair for me to license its derivative under the MIT license. Thus, please refer to [LICENSE.TXT](LICENSE.TXT).
 
 
-[688f7a52] REQUIREMENTS
+REQUIREMENTS
 -----------------------
 
 * GTA V 		v1.0.1032.1
 * Script Hook V	v1.0.1032.1		http://www.dev-c.com/gtav/scripthookv/
 
 
-[048bb149] INSTALLATION
+INSTALLATION
 -----------------------
 
 Place OnlineEvents.asi and OnlineEvents.ini in the same folder as ScriptHookV.dll.
 
 
-[169cee22] CONFIGURATION
+CONFIGURATION
 ------------------------
 
 Here's where it gets interesting. The INI file has a lot of values. The defaults are what I settled on to provide balanced, fun gameplay. With few exceptions, you can set them to whatever you want- but extreme values may very well break the game. I will try to elaborate below. Bonus: I literally copied the OnlineEvents.ini. If you want to reset to defaults, you can just copy the following section back in.
-
+```
 [OPTIONS]
 ; Set to false to turn beeps off.
 play_notification_beeps=true
@@ -137,25 +137,25 @@ vehicle_search_range_minimum=30
 maximum_number_of_spawn_points=10000
 ; This probably never needs to be touched. It works the same way as above, but the game only has a few hundred models anyway. Also, this isn't holding the models themselves, only hashes, so it's not really a memory issue.
 maximum_number_of_vehicle_models=1000
+```
 
-
-[ea67c94d] KNOWN ISSUES
+KNOWN ISSUES
 -----------------------
 
 * Vehicle Persistence. Since the script dynamically gathers spawn points (I wonder how many times I will type that), the 30-some vehicles that are spawned by the otherwise superlative 'I'm Not MentaL's Persistance Mod'[sic] are considered possible spawns, even though the game engine would normally never place vehicles where I parked most of mine... I have some techniques in place to try to avoid spawning vehicles where vehicles already exist, but I'm open to further ideas.
 
 * The script uses parked spawn points for the armored cars. This means that they spawn in parking garages with embarrassing regularity. This wouldn't be embarrassing, except that they generally have a difficult time navigating out. Sometimes, they literally give up and run away from the truck, which obviously makes the event rather trivial. Possible fixes include a) discovering un-parked spawn points (via my method, probably infeasible. I could gather millions or billions of points...), and b) checking for a roof over spawns (which won't prevent spawns on the roof of the garage, and will prevent otherwise legitimate spawns under freeways, etc...).
 
-* The doors on the armored truck must be blown open to get the reward, but it seems you're just as likely to blow the truck up. I'm trying to make the script open the doors when the player gets in the driver's seat, but it's not working. I'm actively trying to figure out why.
+* The doors on the armored truck must be blown open to get the reward, but it seems you're just as likely to blow the truck up. I tried to make the script open the doors when the player gets in the driver's seat, but for some reason it doesn't actually work until the player backs the truck up. Which is odd. I'm actively trying to figure out why.
 
 * The script will only spawn certain vehicle classes for steal missions, but certain vehicles still can't be resprayed (and VEHICLE::_IS_VEHICLE_SHOP_RESPRAY_ALLOWED() doesn't appear to work, at all), such as the Taxi. The most useful (but terribly inelegant) solution in the short term is probably to hard-code an exclude filter for unusable models, so please report any such vehicles.
 
 * The guards protecting the crate are supposed to wander around. They don't. I don't consider this high-priority (they still fight the player), but it's there.
 
-* The script doesn't check for actual mission status, so... probably don't use this until you've finished the game.
+* The script doesn't check for actual (like, story-mode) mission status, so... probably don't use this until you've finished the game.
 
 
-[f520915b] IDEAS/TODOS
+IDEAS/TODOS
 ----------------------
 
 * Assassination missions should include some context, so the player isn't just killing random people. It's a little bit immersion-breaking for me to run around killing random peds who are literally just minding their own business (it doesn't help that I'm morally opposed to killing innocent people anyway - incidentally, GTAV is a hard game for me to play...) Also, bodyguards might at least provide a challenge.
@@ -167,7 +167,7 @@ maximum_number_of_vehicle_models=1000
 * I'm certainly open to new ideas.
 
 
-[7e583746] FAQ 
+FAQ 
 --------------
 
 Nobody has asked me any questions. I'll put some things that maybe I might be asked.
@@ -188,17 +188,17 @@ Nobody has asked me any questions. I'll put some things that maybe I might be as
 	- By excruciating trial-and-error. No.
 
 
-[4ab3a4a2] CHANGELOG 
+CHANGELOG 
 --------------------
 
  1.0	- Umm...
 
 
-[8eaae8e2] CREDITS
+CREDITS
 ------------------
 
 * Plastic Tangerine
-	- Created the original mod on which this work is based. If not for you including your source, I never would have tried something like this. So thank you, very much.
+	- Created the original mod on which this work is based. Plastic Tangerine, if not for you including your source, I never would have tried something like this. So thank you, very much.
 * Alexander Blade
 	- Created Script Hook V. Plus I, like Plastic Tangerine, appropriated code from his SDK.
 * xiaohe521
