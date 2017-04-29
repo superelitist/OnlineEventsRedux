@@ -6,16 +6,17 @@ CONTENTS OF THIS DOCUMENT
 
  * [Introduction](#INTRODUCTION)
  * [Disclaimer](#DISCLAIMER)
- * [License](#License)
- * [Requirements](#Requirements)
- * [Installation](#Installation)
- * [Configuration](#Configuration)
- * [Known Issues](#Known-Issues)
- * [Ideas/Todos](#Ideas/Todos)
+ * [License](#LICENSE)
+ * [Requirements](#REQUIREMENTS)
+ * [Installation](#INSTALLATION)
+ * [Configuration](#CONFIGURATION)
+ * [Known Issues](#KNOWN-ISSUES)
+ * [Ideas/Todos](#IDEAS-TODOS)
  * [FAQ](#FAQ)
- * [Changelog](#Changelog)
- * [Credits](#Credits)
+ * [Changelog](#CHANGELOG)
+ * [Credits](#CREDITS)
 
+<a name="INTRODUCTION"></a>
 
 INTRODUCTION
 -----------------------
@@ -32,6 +33,7 @@ The original concept of the mod is more or less the same. There are five mission
 
 I think they're pretty self-explanatory. If you ignore the event (or take too long), the mission will time out (unless you're relatively close). There is also a cooldown period after each mission. On completion, you will get a lot of money (compared to vanilla events). Almost all of these values can be modified.
 
+<a name="DISCLAIMER"></a>
 
 DISCLAIMER
 ---------------------
@@ -42,6 +44,7 @@ This supersedes all previous notices. *(credit: idiot-dog.com/disclaimer)*
 
 No but seriously, if you use this and something goes sideways, refer to the [LICENSE.TXT](LICENSE.TXT), specifically the part in all caps where it says I won't help you.
 
+<a name="LICENSE"></a>
 
 LICENSE
 ------------------
@@ -50,6 +53,7 @@ Plastic Tangerine included this on their mod page: "You may modify, and use code
 
 I've almost completely rewritten the code. It bears virtually no resemblance to the original. Although the original license appears to be attribution-only, I suspect that they would feel it fair for me to license its derivative under the MIT license. Thus, please refer to [LICENSE.TXT](LICENSE.TXT).
 
+<a name="REQUIREMENTS"></a>
 
 REQUIREMENTS
 -----------------------
@@ -57,12 +61,14 @@ REQUIREMENTS
 * GTA V 		v1.0.1032.1
 * Script Hook V	v1.0.1032.1		http://www.dev-c.com/gtav/scripthookv/
 
+<a name="INSTALLATION"></a>
 
 INSTALLATION
 -----------------------
 
 Place OnlineEvents.asi and OnlineEvents.ini in the same folder as ScriptHookV.dll.
 
+<a name="CONFIGURATION"></a>
 
 CONFIGURATION
 ------------------------
@@ -139,6 +145,8 @@ maximum_number_of_spawn_points=10000
 maximum_number_of_vehicle_models=1000
 ```
 
+<a name="KNOWN-ISSUES"></a>
+
 KNOWN ISSUES
 -----------------------
 
@@ -154,6 +162,7 @@ KNOWN ISSUES
 
 * The script doesn't check for actual (like, story-mode) mission status, so... probably don't use this until you've finished the game.
 
+<a name="IDEAS-TODOS"></a>
 
 IDEAS/TODOS
 ----------------------
@@ -166,6 +175,7 @@ IDEAS/TODOS
 
 * I'm certainly open to new ideas.
 
+<a name="FAQ"></a>
 
 FAQ 
 --------------
@@ -187,12 +197,14 @@ Nobody has asked me any questions. I'll put some things that maybe I might be as
 * "How did you learn to make mods? Will you teach me?"
 	- By excruciating trial-and-error. No.
 
+<a name="CHANGELOG"></a>
 
 CHANGELOG 
 --------------------
 
  1.0	- Umm...
 
+<a name="CREDITS"></a>
 
 CREDITS
 ------------------
