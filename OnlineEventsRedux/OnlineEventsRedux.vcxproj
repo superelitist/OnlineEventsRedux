@@ -33,8 +33,8 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{8D82F34A-1D64-465B-84B1-37F89AD3D20B}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>MyFirstGTAVMod</RootNamespace>
-    <ProjectName>OnlineEvents</ProjectName>
+    <RootNamespace>OnlineEventsReduxRedux</RootNamespace>
+    <ProjectName>OnlineEventsReduxRedux</ProjectName>
     <WindowsTargetPlatformVersion>10.0.15063.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -88,7 +88,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;Pools_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <AdditionalIncludeDirectories>C:\Users\Super\OneDrive - Dauphin County Library System\_Scripts\cplusplus\OnlineEvents\OnlineEvents;C:\Program Files (x86)\Windows Kits\10\Include\10.0.15063.0\um;$(WindowsSdkDir)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\Super\OneDrive - Dauphin County Library System\_Scripts\cplusplus\OnlineEventsReduxRedux\OnlineEventsRedux;C:\Program Files (x86)\Windows Kits\10\Include\10.0.15063.0\um;$(WindowsSdkDir)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <CompileAsManaged>false</CompileAsManaged>
       <ExceptionHandling>Sync</ExceptionHandling>
     </ClCompile>
@@ -111,7 +111,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;Pools_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <AdditionalIncludeDirectories>C:\Users\Super\OneDrive - Dauphin County Library System\_Scripts\cplusplus\OnlineEvents\OnlineEvents;C:\Program Files (x86)\Windows Kits\10\Include\10.0.15063.0\um;$(WindowsSdkDir)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\Super\OneDrive - Dauphin County Library System\_Scripts\cplusplus\OnlineEventsRedux\OnlineEventsRedux;C:\Program Files (x86)\Windows Kits\10\Include\10.0.15063.0\um;$(WindowsSdkDir)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

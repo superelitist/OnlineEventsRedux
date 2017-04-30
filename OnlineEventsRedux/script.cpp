@@ -1,9 +1,3 @@
-/*
-	THIS FILE IS A PART OF GTA V SCRIPT HOOK SDK
-				http://dev-c.com			
-			(C) Alexander Blade 2015
-*/
-
 
 #define NOMINMAX
 
@@ -19,8 +13,8 @@
 #include <string>
 #include <vector>
 
-CIniReader Reader(".\\OnlineEvents.ini");
-Log Logger(".\\OnlineEvents.log", LogNormal);
+CIniReader Reader(".\\OnlineEventsRedux.ini");
+Log Logger(".\\OnlineEventsRedux.log", LogNormal);
 
 #pragma warning(disable : 4244 4305) // double <-> float conversions
 #pragma warning(disable : 4302)
@@ -1043,7 +1037,7 @@ void ScriptMain() {
 	
 	init();
 	
-	CreateNotification("~r~Online Events Redux!~w~ v1.0", play_notification_beeps);
+	CreateNotification("~r~Online Events Redux!~w~ (v1.0)", play_notification_beeps);
 	MissionHandler Handler;
 
 	int timer = GetTickCount64();
