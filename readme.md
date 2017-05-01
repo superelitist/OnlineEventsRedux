@@ -167,11 +167,33 @@ KNOWN ISSUES
 IDEAS/TODOS
 ----------------------
 
+[ ] Ensure next spawn is (n) meters from last spawn - minimum_distance_between_spawns
+
+[ ] Mark parking garages to avoid for Armored Truck missions.
+
+[ ] YOU'VE DONE A LOT OF CRIME
+	Randomly receive some star(s).
+	Escape.
+
+[ ] CRATE DROP
+	Plane or helicopter appears on map.
+	Enemy vehicles spawn as well.
+	Follow it to drop point.
+	Try to acquire the crate before the enemy does.
+
+[ ] DISTRACT
+	Go to a point.
+	Get (n) star(s).
+	Keep those stars for (n) seconds, but don't go further than (n) meters from origin.
+	Receive warning when you're further than (n/2) meters.
+
+[ ] SELF DEFENSE
+	An enemy hitman (or squad) has found you.
+	Survive.
+
 * Assassination missions should include some context, so the player isn't just killing random people. It's a little bit immersion-breaking for me to run around killing random peds who are literally just minding their own business (it doesn't help that I'm morally opposed to killing innocent people anyway - incidentally, GTAV is a hard game for me to play...) Also, bodyguards might at least provide a challenge.
 
 * The destroy vehicle mission is actually rather boring. I'm thinking of adding a driver, and/or opposing 'smugglers' who will try to steal the vehicle and escape. This seems complicated to code, though.
-
-* The crate drop mission is likewise wooden. I'd like to spawn the enemy peds in vehicles, and have them race the player to the crate. Again, complicated.
 
 * I'm certainly open to new ideas.
 
