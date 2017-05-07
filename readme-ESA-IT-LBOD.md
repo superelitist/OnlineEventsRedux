@@ -33,8 +33,6 @@ The original concept of the mod is more or less the same. There are five mission
 
 I think they're pretty self-explanatory. If you ignore the event (or take too long), the mission will time out (unless you're relatively close). There is also a cooldown period after each mission. On completion, you will get a lot of money (compared to vanilla events). Almost all of these values can be modified.
 
-
-
 <a name="DISCLAIMER"></a>
 
 DISCLAIMER
@@ -169,11 +167,33 @@ KNOWN ISSUES
 IDEAS/TODOS
 ----------------------
 
+[ ] Ensure next spawn is (n) meters from last spawn - minimum_distance_between_spawns
+
+[ ] Mark parking garages to avoid for Armored Truck missions.
+
+[ ] YOU'VE DONE A LOT OF CRIME
+	Randomly receive some star(s).
+	Escape.
+
+[ ] CRATE DROP
+	Plane or helicopter appears on map.
+	Enemy vehicles spawn as well.
+	Follow it to drop point.
+	Try to acquire the crate before the enemy does.
+
+[ ] DISTRACT
+	Go to a point.
+	Get (n) star(s).
+	Keep those stars for (n) seconds, but don't go further than (n) meters from origin.
+	Receive warning when you're further than (n/2) meters.
+
+[ ] SELF DEFENSE
+	An enemy hitman (or squad) has found you.
+	Survive.
+
 * Assassination missions should include some context, so the player isn't just killing random people. It's a little bit immersion-breaking for me to run around killing random peds who are literally just minding their own business (it doesn't help that I'm morally opposed to killing innocent people anyway - incidentally, GTAV is a hard game for me to play...) Also, bodyguards might at least provide a challenge.
 
 * The destroy vehicle mission is actually rather boring. I'm thinking of adding a driver, and/or opposing 'smugglers' who will try to steal the vehicle and escape. This seems complicated to code, though.
-
-* The crate drop mission is likewise wooden. I'd like to spawn the enemy peds in vehicles, and have them race the player to the crate. Again, complicated.
 
 * I'm certainly open to new ideas.
 
@@ -182,32 +202,7 @@ IDEAS/TODOS
 FAQ 
 --------------
 
-* As requested by several people, here's what I think the difference are between Plastic Tangerine's mod and mine. There may be other minor differences I can't remember or that were unintentional:
-	- The single biggest change (really the reason I decided to rewrite it in the first place.) is the dynamic spawn points: each of the missions in PT's mod had 10 hard-coded spawn points. This means that after playing for a while, you would begin revisiting the same spots. I got tired of finding a smuggler's vehicle behind the strip mall 5 times in a row. My mod uses an algorithm to try and dynamically find suitable places to spawn a vehicle, and thus you may find that the missions point you to virtually anywhere on the map (I have had upwards of twenty thousand possible spawn points in a single game).
-
-* **Steal Vehicle**
- 	- Picks from dynamically generated spawn points rather than 10 hard-coded locations.
- 	- Picks from random vehicle models instead of 10 hard-coded. Allows you to select which vehicle classes are available to pick from (but always has a chance to not pick Supers, Sports, Sport Classics, and Off-Road vehicles).
- 	- Has a chance to lock the doors and or require hot-wiring.
- 	- Sometimes requires that the vehicle be undamaged on delivery.
- 	- Randomly gives 0, 1 or 2 stars (or even 3 if the vehicle is a Super) when the player steals the vehicle.
- 	- Rewards are based on the average value of vehicles in the class, plus or minus a random amount (but much more than PT's mod).
-
-* **Destroy Vehicle & Assassination**
-	- Randomly picks from spawn points and models, as above.
-	- Rewards more money than original mod.
-
-* **Armored Truck**
-	- Randomly picks from spawn points, as above (although as noted in Known Issues, this can sometimes result in them getting stuck).
-	- Sometimes spawns a passenger, and locks the doors until they leave the vehicle (which can happen if they can't drive it anymore), or die.
-	- The rear doors can be opened by entering the driver's seat (instead of only by using explosives).
-
-* **Crate Drop**
-	 - Randomly spawns 5 guards instead of 10 (plus 3 more for a 'special' crate), and randomly selects the weapons they use.
-	 - Bad guys face away from the crate (which might not seem like a big deal but it took me hours to figure out!).
-	 - Recovering the crate no longer rewards weapons because why? If you're playing this in the endgame like you should be, you already have access to all the weapons.
-	 - Recovering the crate rewards more money.
-
+Nobody has asked me any questions. I'll put some things that maybe I might be asked.
 
 * "Is the source code available?"
 	- Yes: https://github.com/superelitist/OnlineEvents
