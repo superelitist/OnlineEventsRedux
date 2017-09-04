@@ -1,8 +1,8 @@
 
 #define NOMINMAX
 
-#include "IniReader.h"
-#include "IniWriter.h"
+#include "..\..\inc\INIReader.h"
+#include "..\..\inc\INIWriter.h"
 #include "iostream"
 #include "Log.h"
 #include "script.h"
