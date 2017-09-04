@@ -88,7 +88,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;Pools_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <AdditionalIncludeDirectories>C:\Users\Super\OneDrive - Dauphin County Library System\_Scripts\cplusplus\OnlineEventsReduxRedux\OnlineEventsRedux;C:\Program Files (x86)\Windows Kits\10\Include\10.0.15063.0\um;$(WindowsSdkDir)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\Super Elitist\Dauphin County Library System\OneDrive - Dauphin County Library System\_Code\cplusplus\inc;C:\Users\Super Elitist\Dauphin County Library System\OneDrive - Dauphin County Library System\_Code\cplusplus\OnlineEventsRedux\OnlineEventsRedux;C:\Users\Super\OneDrive - Dauphin County Library System\_Code\cplusplus\OnlineEventsReduxRedux\OnlineEventsRedux;C:\Program Files (x86)\Windows Kits\10\Include\10.0.15063.0\um;$(WindowsSdkDir)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <CompileAsManaged>false</CompileAsManaged>
       <ExceptionHandling>Sync</ExceptionHandling>
     </ClCompile>
