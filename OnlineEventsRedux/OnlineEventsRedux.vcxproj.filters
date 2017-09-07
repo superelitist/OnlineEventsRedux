@@ -3,9 +3,9 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="script.cpp" />
+    <ClCompile Include="Log.cpp" />
     <ClCompile Include="..\..\inc\INIReader.cpp" />
     <ClCompile Include="..\..\inc\INIWriter.cpp" />
-    <ClCompile Include="Log.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\inc\enums.h">
@@ -20,16 +20,16 @@
     <ClInclude Include="..\..\inc\main.h">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\inc\INIReader.h">
-      <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\inc\INIWriter.h">
-      <Filter>include</Filter>
-    </ClInclude>
     <ClInclude Include="Log.h">
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="script.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\inc\INIReader.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\inc\INIWriter.h">
       <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>
