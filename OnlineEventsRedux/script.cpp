@@ -3,6 +3,7 @@
 
 #include "..\..\inc\INIReader.h"
 #include "..\..\inc\INIWriter.h"
+#include "..\..\inc\keyboard.h"
 #include "iostream"
 #include "Log.h"
 #include "script.h"
@@ -40,6 +41,7 @@ uint mission_minimum_range_for_timeout;
 float mission_reward_modifier;
 int stealable_vehicle_classes;
 int destroyable_vehicle_classes;
+uint number_of_guards;
 
 // debug options
 LogLevel logging_level;
@@ -383,7 +385,9 @@ private:
 	bool crate_is_special_ = false;
 	bool objects_were_spawned_ = false;
 	Object crate_;
-	Ped guard_1_, guard_2_, guard_3_, guard_4_, guard_5_, guard_6_, guard_7_, guard_8_;
+	// Ped guard_1_, guard_2_, guard_3_, guard_4_, guard_5_, guard_6_, guard_7_, guard_8_;
+	uint number_of_guards_;
+	std::vector<Ped> guards_;
 };
 
 MissionType CrateDropMission::Prepare() {
@@ -441,42 +445,26 @@ MissionType CrateDropMission::Execute() {
 		Ped skin = GAMEPLAY::GET_HASH_KEY("mp_g_m_pros_01");
 		STREAMING::REQUEST_MODEL(skin);
 		while (!STREAMING::HAS_MODEL_LOADED(skin)) WAIT(0);
-		if (!ENTITY::DOES_ENTITY_EXIST(guard_1_)) guard_1_ = SpawnABadGuy(skin, crate_spawn_location_, 10, 10, 0, "SURPRISE_ME");
-		if (!ENTITY::DOES_ENTITY_EXIST(guard_2_)) guard_2_ = SpawnABadGuy(skin, crate_spawn_location_, 10, 10, 0, "SURPRISE_ME");
-		if (!ENTITY::DOES_ENTITY_EXIST(guard_3_)) guard_3_ = SpawnABadGuy(skin, crate_spawn_location_, 10, 10, 0, "SURPRISE_ME");
-		if (!ENTITY::DOES_ENTITY_EXIST(guard_4_)) guard_4_ = SpawnABadGuy(skin, crate_spawn_location_, 10, 10, 0, "SURPRISE_ME");
-		if (!ENTITY::DOES_ENTITY_EXIST(guard_5_)) guard_5_ = SpawnABadGuy(skin, crate_spawn_location_, 10, 10, 0, "SURPRISE_ME");
-		if (!ENTITY::DOES_ENTITY_EXIST(guard_6_) && crate_is_special_) guard_6_ = SpawnABadGuy(skin, crate_spawn_location_, 10, 10, 0, "SURPRISE_ME");
-		if (!ENTITY::DOES_ENTITY_EXIST(guard_7_) && crate_is_special_) guard_7_ = SpawnABadGuy(skin, crate_spawn_location_, 10, 10, 0, "SURPRISE_ME");
-		if (!ENTITY::DOES_ENTITY_EXIST(guard_8_) && crate_is_special_) guard_8_ = SpawnABadGuy(skin, crate_spawn_location_, 10, 10, 0, "SURPRISE_ME");
-		//if (ENTITY::DOES_ENTITY_EXIST(guard_1_) ||
-		//	ENTITY::DOES_ENTITY_EXIST(guard_2_) ||
-		//	ENTITY::DOES_ENTITY_EXIST(guard_3_) ||
-		//	ENTITY::DOES_ENTITY_EXIST(guard_4_) ||
-		//	ENTITY::DOES_ENTITY_EXIST(guard_5_)) {
-		//	Logger.Write("creating flare", LogNormal);
-		//	Hash flare = GAMEPLAY::GET_HASH_KEY("WEAPON_FLARE");
-		//	WEAPON::REQUEST_WEAPON_ASSET(flare, 31, 0);
-		//	while (!WEAPON::HAS_WEAPON_ASSET_LOADED(flare)) {
-		//		WAIT(0);
-		//	}
-		//	Logger.Write("shooting flare", LogNormal);
-		//	GAMEPLAY::SHOOT_SINGLE_BULLET_BETWEEN_COORDS(crate_spawn_location_.x, crate_spawn_location_.y + 1.0f, crate_spawn_location_.z, crate_spawn_location_.x, crate_spawn_location_.y + 1.5, crate_spawn_location_.z, 0, 1, flare, playerPed, 1, 1, 100.0);
-		//	FIRE::ADD_EXPLOSION(crate_spawn_location_.x, crate_spawn_location_.y + 1.0f, crate_spawn_location_.z, 19, 0.0f, 0, 0, 0);
-		//}
+		if (crate_is_special_) number_of_guards_ = round(number_of_guards_ * 1.5);
+		for (int i = 0; i < number_of_guards_; i++) {
+			guards_.push_back(SpawnABadGuy(skin, crate_spawn_location_, 10, 10, 0, "SURPRISE_ME"));
+		}
 		objects_were_spawned_ = true;
 	}
 
 	if (objects_were_spawned_ && !ENTITY::DOES_ENTITY_EXIST(crate_)) {
-		ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_1_);
+		for (Ped guard : guards_) {
+			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard);
+		}
+		/*ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_1_);
 		ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_2_);
 		ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_3_);
 		ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_4_);
-		ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_5_);
+		ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_5_);*/
 		if (crate_is_special_) {
-			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_6_);
+			/*ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_6_);
 			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_7_);
-			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_8_);
+			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_8_);*/
 			ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(50000, 150000), mission_reward_modifier);
 		}
 		else ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(25000, 75000), mission_reward_modifier);
@@ -493,11 +481,14 @@ MissionType CrateDropMission::Timeout() {
 	if (distance_to_crate > mission_minimum_range_for_timeout || ENTITY::IS_ENTITY_DEAD(playerPed)) {
 		UI::REMOVE_BLIP(&crate_blip_);
 		ENTITY::SET_OBJECT_AS_NO_LONGER_NEEDED(&crate_);
-		ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_1_);
-		ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_2_);
-		ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_3_);
-		ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_4_);
-		ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_5_);
+		for (Ped guard : guards_) {
+			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard);
+		}
+		//ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_1_);
+		//ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_2_);
+		//ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_3_);
+		//ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_4_);
+		//ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_5_);
 		CreateNotification("The ~g~crate~w~ has been claimed by smugglers.", play_notification_beeps);
 		return NO_Mission;
 	}
@@ -951,6 +942,7 @@ void Update() {
 	player = PLAYER::PLAYER_ID(); // need to be updated every cycle?
 	vehicle_spawn_points = GetParkedVehiclesFromWorld(playerPed, vehicle_spawn_points, maximum_number_of_spawn_points, vehicle_search_range_minimum);
 	possible_vehicle_models = GetVehicleModelsFromWorld(playerPed, possible_vehicle_models, maximum_number_of_vehicle_models);
+
 	return;
 }
 
@@ -1000,6 +992,7 @@ void GetSettingsFromIniFile() {
 	mission_reward_modifier = Reader.ReadFloat("Options", "mission_reward_modifier", 1.0f);
 	stealable_vehicle_classes = Reader.ReadInteger("Options", "stealable_vehicle_flags", Compact | Sedan | SUV | Coupe | Muscle | SportsClassic | Sports | Super | Motorcycle | OffRoad);
 	destroyable_vehicle_classes = Reader.ReadInteger("Options", "destroyable_vehicle_flags", SUV | Muscle | OffRoad | Motorcycle);
+	number_of_guards = std::min(Reader.ReadInteger("Options", "number_of_guards", 6), 12);
 	// DEBUG
 	logging_level = LogLevel (std::max(Reader.ReadInteger("Debug", "logging_level", 1), 1)); // right now at least, I don't want to let anyone turn logging entirely off.
 	seconds_to_wait_for_vehicle_persistence_scripts = Reader.ReadInteger("Debug", "seconds_to_wait_for_vehicle_persistence_scripts", 0);
@@ -1008,6 +1001,17 @@ void GetSettingsFromIniFile() {
 	maximum_number_of_spawn_points = Reader.ReadInteger("Debug", "maximum_number_of_spawn_points", 20000);
 	maximum_number_of_vehicle_models = Reader.ReadInteger("Debug", "maximum_number_of_vehicle_models", 1000);
 	return;
+}
+
+void DumpVectorToFile(std::string filename, std::vector<Vector4> vector) {
+	std::ofstream file_object_ = std::ofstream(filename);
+	if (file_object_.is_open()) {
+		file_object_ << "name,latitude,longitude" << std::endl;
+		uint number = 1;
+		for (Vector4 v4 : vector) {
+			file_object_ << number++ << "," << v4.x << "," << v4.y << std::endl;
+		}
+	}
 }
 
 //int LogLocationAndGroundZ(int timer) {
@@ -1038,15 +1042,20 @@ void ScriptMain() {
 	init();
 	
 	CreateNotification("~r~Online Events Redux!~w~ (v1.0)", play_notification_beeps);
-	MissionHandler Handler;
+	MissionHandler MissionHandler;
 
 	int timer = GetTickCount64();
 
 	while (true) {
 		WaitDuringDeathArrestOrLoading(0);
 		Update();
-		Handler.Update();
+		MissionHandler.Update();
 		WAIT(0);
+		if (IsKeyDown(VK_OEM_4) && IsKeyJustUp(VK_OEM_6)) {
+			std::time_t time_since_epoch = std::time(nullptr);
+			std::string filename = "vehicle_spawn_points_" + std::to_string(time_since_epoch);
+			DumpVectorToFile(filename, vehicle_spawn_points);
+		}
 	}
 
 	Logger.Close(); // I don't think this will ever happen...

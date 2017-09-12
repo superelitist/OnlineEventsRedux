@@ -32,10 +32,17 @@
     <ClInclude Include="..\..\inc\INIWriter.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="resource1.h" />
+    <ClInclude Include="..\..\inc\keyboard.h">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="include">
       <UniqueIdentifier>{5d58942b-ebbf-4d0a-9526-359e3a556796}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="OnlineEventsReduxRedux.rc" />
   </ItemGroup>
 </Project>

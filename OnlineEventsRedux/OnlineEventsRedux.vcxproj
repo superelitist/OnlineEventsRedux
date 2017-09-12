@@ -23,12 +23,17 @@
   <ItemGroup>
     <ClInclude Include="..\..\inc\INIReader.h" />
     <ClInclude Include="..\..\inc\INIWriter.h" />
+    <ClInclude Include="..\..\inc\keyboard.h" />
     <ClInclude Include="..\..\inc\main.h" />
     <ClInclude Include="..\..\inc\enums.h" />
     <ClInclude Include="..\..\inc\natives.h" />
     <ClInclude Include="..\..\inc\types.h" />
     <ClInclude Include="Log.h" />
+    <ClInclude Include="resource1.h" />
     <ClInclude Include="script.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="OnlineEventsReduxRedux.rc" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{8D82F34A-1D64-465B-84B1-37F89AD3D20B}</ProjectGuid>
