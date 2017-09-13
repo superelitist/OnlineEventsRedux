@@ -42,7 +42,7 @@ uint mission_minimum_range_for_timeout;
 float mission_reward_modifier;
 int stealable_vehicle_classes;
 int destroyable_vehicle_classes;
-uint number_of_guards;
+uint number_of_guards_to_spawn;
 
 // debug options
 LogLevel logging_level;
@@ -399,7 +399,7 @@ private:
 	bool objects_were_spawned_ = false;
 	Object crate_;
 	// Ped guard_1_, guard_2_, guard_3_, guard_4_, guard_5_, guard_6_, guard_7_, guard_8_;
-	uint number_of_guards_;
+	//uint number_of_guards_ = number_of_guards;
 	std::vector<Ped> guards_;
 };
 
@@ -458,8 +458,9 @@ MissionType CrateDropMission::Execute() {
 		Ped skin = GAMEPLAY::GET_HASH_KEY("mp_g_m_pros_01");
 		STREAMING::REQUEST_MODEL(skin);
 		while (!STREAMING::HAS_MODEL_LOADED(skin)) WAIT(0);
-		if (crate_is_special_) number_of_guards_ = round(number_of_guards_ * 1.5);
-		for (uint i = 0; i < number_of_guards_; i++) {
+		uint number_of_guards = number_of_guards_to_spawn;
+		if (crate_is_special_) number_of_guards = round(number_of_guards_to_spawn * 1.5);
+		for (uint i = 0; i < number_of_guards; i++) {
 			guards_.push_back(SpawnABadGuy(skin, crate_spawn_location_, 10, 10, 0, "SURPRISE_ME"));
 		}
 		objects_were_spawned_ = true;
@@ -913,7 +914,8 @@ void MissionHandler::Update() {
 	tick_count_at_last_update_ = GetTickCount64();
 
 	if (ticks_since_last_mission_ > ticks_between_missions_) { // Enough time has passed that we can start a new mission.
-		current_mission_type_ = MissionType(rand() % MAX_Mission); // I used to think this was silly. Now I think it's awesome.
+		//current_mission_type_ = MissionType(rand() % MAX_Mission); // I used to think this was silly. Now I think it's awesome.
+		current_mission_type_ = CrateDrop;
 		switch (current_mission_type_) {
 		case StealVehicle	:	current_mission_type_ = StealVehicleMission.Prepare();		break; // Prepare()s should return their MissionType on success.
 		case DestroyVehicle	:	current_mission_type_ = DestroyVehicleMission.Prepare();	break; // If something goes wrong (StealVehicleMission takes too
@@ -1011,7 +1013,7 @@ void GetSettingsFromIniFile() {
 	mission_reward_modifier = Reader.ReadFloat("Options", "mission_reward_modifier", 1.0f);
 	stealable_vehicle_classes = Reader.ReadInteger("Options", "stealable_vehicle_flags", Compact | Sedan | SUV | Coupe | Muscle | SportsClassic | Sports | Super | Motorcycle | OffRoad);
 	destroyable_vehicle_classes = Reader.ReadInteger("Options", "destroyable_vehicle_flags", SUV | Muscle | OffRoad | Motorcycle);
-	number_of_guards = std::min(Reader.ReadInteger("Options", "number_of_guards", 6), 12);
+	number_of_guards_to_spawn = std::min(Reader.ReadInteger("Options", "number_of_guards", 6), 12);
 	// DEBUG
 	logging_level = LogLevel (std::max(Reader.ReadInteger("Debug", "logging_level", 1), 1)); // right now at least, I don't want to let anyone turn logging entirely off.
 	seconds_to_wait_for_vehicle_persistence_scripts = Reader.ReadInteger("Debug", "seconds_to_wait_for_vehicle_persistence_scripts", 0);
