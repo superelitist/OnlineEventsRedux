@@ -5,6 +5,7 @@
 #include "..\..\inc\INIWriter.h"
 #include "..\..\inc\keyboard.h"
 #include "iostream"
+#include <iomanip>
 #include "Log.h"
 #include "script.h"
 #include "strings.h"
@@ -46,7 +47,7 @@ uint number_of_guards;
 // debug options
 LogLevel logging_level;
 uint seconds_to_wait_for_vehicle_persistence_scripts, number_of_tries_to_select_items, vehicle_search_range_minimum;
-uint maximum_number_of_spawn_points, maximum_number_of_vehicle_models;
+uint maximum_number_of_spawn_points, maximum_number_of_vehicle_models, distance_to_draw_spawn_points;
 
 void NotifyBottomCenter(char* message) {
 	Logger.Write("NotifyBottomCenter()", LogExtremelyVerbose);
@@ -270,11 +271,23 @@ std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vector4> ve
 					// CHECK WHETHER THERE IS A BLIP AT THIS POSITION
 					// CHECK WHETHER THERE IS A BLIP AT THIS POSITION
 					auto predicate = [this_vehicle_position](const Vector4 & item) { // didn't want to define a lambda inline, it gets ugly fast.
-						return (item.x == this_vehicle_position.x && item.y == this_vehicle_position.y && item.z == this_vehicle_position.z && item.h == this_vehicle_position.h);
+						bool too_close_to_another_point = (GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(item.x, item.y, item.z, this_vehicle_position.x, this_vehicle_position.y, this_vehicle_position.z, 0) < 1.0);
+						return (too_close_to_another_point);
 					};
-					bool found = (std::find_if(vector_of_vector4s.begin(), vector_of_vector4s.end(), predicate) != vector_of_vector4s.end()); // make sure this_vehicle_position does not already exist in vector_of_vector4s
-					if (!found) {
+					bool found_in_vector = (std::find_if(vector_of_vector4s.begin(), vector_of_vector4s.end(), predicate) != vector_of_vector4s.end()); // make sure this_vehicle_position does not already exist in vector_of_vector4s
+					if (!found_in_vector) {
 						vector_of_vector4s.push_back(this_vehicle_position);
+						// DEBUG STUFF
+						//Vector3 debug_position = ENTITY::GET_ENTITY_COORDS(this_vehicle, 0);
+						//Logger.Write("GetParkedCarsFromWorld(): this_vehicle_position x: " + std::to_string(this_vehicle_position.x), LogVeryVerbose);
+						//Logger.Write("GetParkedCarsFromWorld(): debug_position x: " + std::to_string(debug_position.x), LogVeryVerbose);
+						//Logger.Write("GetParkedCarsFromWorld(): debug_position _paddingx: " + std::to_string(debug_position._paddingx), LogVeryVerbose);
+						//Logger.Write("GetParkedCarsFromWorld(): debug_position y: " + std::to_string(debug_position.y), LogVeryVerbose);
+						//Logger.Write("GetParkedCarsFromWorld(): debug_position _paddingy: " + std::to_string(debug_position._paddingy), LogVeryVerbose);
+						//Logger.Write("GetParkedCarsFromWorld(): debug_position z: " + std::to_string(debug_position.z), LogVeryVerbose);
+						//Logger.Write("GetParkedCarsFromWorld(): debug_position _paddingz: " + std::to_string(debug_position._paddingz), LogVeryVerbose);
+
+						// END DEBUG STUFF
 					}
 					if (vector_of_vector4s.size() > maximum_vector_size) vector_of_vector4s.erase(vector_of_vector4s.begin()); // just in case it gets filled up, first in first out
 				}
@@ -446,7 +459,7 @@ MissionType CrateDropMission::Execute() {
 		STREAMING::REQUEST_MODEL(skin);
 		while (!STREAMING::HAS_MODEL_LOADED(skin)) WAIT(0);
 		if (crate_is_special_) number_of_guards_ = round(number_of_guards_ * 1.5);
-		for (int i = 0; i < number_of_guards_; i++) {
+		for (uint i = 0; i < number_of_guards_; i++) {
 			guards_.push_back(SpawnABadGuy(skin, crate_spawn_location_, 10, 10, 0, "SURPRISE_ME"));
 		}
 		objects_were_spawned_ = true;
@@ -943,6 +956,12 @@ void Update() {
 	vehicle_spawn_points = GetParkedVehiclesFromWorld(playerPed, vehicle_spawn_points, maximum_number_of_spawn_points, vehicle_search_range_minimum);
 	possible_vehicle_models = GetVehicleModelsFromWorld(playerPed, possible_vehicle_models, maximum_number_of_vehicle_models);
 
+	Vector3 player_coordinates = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
+	for (Vector4 v4 : vehicle_spawn_points) {
+		if (GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, v4.x, v4.y, v4.z, 0) < distance_to_draw_spawn_points) {
+			GRAPHICS::DRAW_MARKER(1, v4.x, v4.y, v4.z, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 100.0f, 255, 0, 0, 100, false, false, 2, false, false, false, false); // redraws every frame, no need to remove later
+		}
+	}
 	return;
 }
 
@@ -985,7 +1004,7 @@ void GetSettingsFromIniFile() {
 	play_notification_beeps = Reader.ReadBoolean("Options", "play_notification_beeps", true);
 	use_default_blip = Reader.ReadBoolean("Options", "use_default_blip", false);
 	mission_timeout = std::max(Reader.ReadInteger("Options", "mission_timeout", 360), 180);
-	mission_cooldown = std::max(Reader.ReadInteger("Options", "mission_cooldown", 60), 30); // these minimums should be mentioned in the ini.
+	mission_cooldown = std::max(Reader.ReadInteger("Options", "mission_cooldown", 60), 30);
 	spawn_point_minimum_range = Reader.ReadInteger("Options", "spawn_point_minimum_range", 1000);
 	spawn_point_maximum_range = Reader.ReadInteger("Options", "spawn_point_maximum_range", 3000);
 	mission_minimum_range_for_timeout = Reader.ReadInteger("Options", "mission_minimum_range_for_timeout", 333);
@@ -1000,6 +1019,7 @@ void GetSettingsFromIniFile() {
 	vehicle_search_range_minimum = Reader.ReadInteger("Debug", "vehicle_search_range_minimum", 30);
 	maximum_number_of_spawn_points = Reader.ReadInteger("Debug", "maximum_number_of_spawn_points", 20000);
 	maximum_number_of_vehicle_models = Reader.ReadInteger("Debug", "maximum_number_of_vehicle_models", 1000);
+	distance_to_draw_spawn_points = std::max(Reader.ReadInteger("Debug", "distance_to_draw_spawn_points", 0), 0);
 	return;
 }
 
@@ -1009,7 +1029,10 @@ void DumpVectorToFile(std::string filename, std::vector<Vector4> vector) {
 		file_object_ << "name,latitude,longitude" << std::endl;
 		uint number = 1;
 		for (Vector4 v4 : vector) {
-			file_object_ << number++ << "," << v4.x << "," << v4.y << std::endl;
+			//UI::ADD_BLIP_FOR_COORD(v4.x, v4.y, v4.z);
+			
+			Logger.Write("v4.x : " + std::to_string(v4.x), LogVeryVerbose);
+			file_object_ << std::setprecision(9) << number++ << "," << v4.x << "," << v4.y << "," << v4.z << "," << v4.h << std::endl;
 		}
 	}
 }
@@ -1044,18 +1067,29 @@ void ScriptMain() {
 	CreateNotification("~r~Online Events Redux!~w~ (v1.0)", play_notification_beeps);
 	MissionHandler MissionHandler;
 
-	int timer = GetTickCount64();
+	//int timer = GetTickCount64();
+	//int cars_found = 0;
 
 	while (true) {
 		WaitDuringDeathArrestOrLoading(0);
 		Update();
 		MissionHandler.Update();
 		WAIT(0);
+
+		//if (GetTickCount64() > timer + (1000 * 10)) {
+		//	timer = GetTickCount64();
+		//	Logger.Write("ScriptMain(): " + std::to_string(vehicle_spawn_points.size() - cars_found) + "cars found in the last ten seconds", LogVeryVerbose);
+		//	cars_found = vehicle_spawn_points.size();
+		//}
+		
 		if (IsKeyDown(VK_OEM_4) && IsKeyJustUp(VK_OEM_6)) {
-			std::time_t time_since_epoch = std::time(nullptr);
-			std::string filename = "vehicle_spawn_points_" + std::to_string(time_since_epoch);
-			DumpVectorToFile(filename, vehicle_spawn_points);
+			//std::time_t time_since_epoch = std::time(nullptr);
+			//std::string filename = "vehicle_spawn_points_" + std::to_string(time_since_epoch) + ".xyz";
+			DumpVectorToFile("vehicle_spawn_points_" + std::to_string(std::time(nullptr)) + ".xyz", vehicle_spawn_points);
 		}
+		//
+		// DEBUG STUFF
+		//
 	}
 
 	Logger.Close(); // I don't think this will ever happen...

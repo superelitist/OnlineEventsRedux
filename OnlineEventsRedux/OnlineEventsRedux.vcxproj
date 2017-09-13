@@ -13,6 +13,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\inc\INIReader.cpp" />
     <ClCompile Include="..\..\inc\INIWriter.cpp" />
+    <ClCompile Include="..\..\inc\keyboard.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="script.cpp">
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</CompileAsManaged>
@@ -29,11 +30,7 @@
     <ClInclude Include="..\..\inc\natives.h" />
     <ClInclude Include="..\..\inc\types.h" />
     <ClInclude Include="Log.h" />
-    <ClInclude Include="resource1.h" />
     <ClInclude Include="script.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="OnlineEventsReduxRedux.rc" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{8D82F34A-1D64-465B-84B1-37F89AD3D20B}</ProjectGuid>
