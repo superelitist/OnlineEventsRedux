@@ -297,35 +297,59 @@ std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vector4> ve
 	return vector_of_vector4s;
 }
 
-Vector4 SelectASpawnPoint(Ped pedestrian, std::vector<Vector4> vector_of_vector4s_to_search, std::vector<Vector4> vector_of_vector4s_to_exclude, uint max_range, uint min_range, Hash vehicle_hash, uint max_tries) {
+Vector4 SelectASpawnPoint(Ped pedestrian, std::vector<Vector4> vector4s_to_search, std::vector<Vector4> vector4s_to_exclude, uint max_range, uint min_range, Hash vehicle_hash, uint max_tries) {
 	Logger.Write("SelectASpawnPoint()", LogExtremelyVerbose);
 	Vector3 pedestrian_coordinates = ENTITY::GET_ENTITY_COORDS(pedestrian, 0);
 	Vector4 empty_spawn_point;
-	if (vector_of_vector4s_to_search.size() == 0) {
-		Logger.Write("SelectASpawnPoint(): vector_of_vector4s_to_search was empty, returning an empty Vector4!", LogError);
-		return empty_spawn_point;
+	std::vector<Vector4> filtered_vector4s;
+	if (vector4s_to_search.size() == 0) { // don't bother continuing with an empty vector.
+		Logger.Write("SelectASpawnPoint(): vector_of_vector4s_to_search was empty (function was provided an empty vector), returning an empty Vector4!", LogError);
+		return empty_spawn_point; // remember, can't throw exceptions, ScripHookV intercepts them.
 	}
-	for (uint i = 0; i < max_tries; i++) {
-		Vector4 spawn_point = vector_of_vector4s_to_search[(rand() % vector_of_vector4s_to_search.size())]; // pick a random possible point from our set
-		float distance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(pedestrian_coordinates.x, pedestrian_coordinates.y, pedestrian_coordinates.z, spawn_point.x, spawn_point.y, spawn_point.z, 0);
-		if (min_range < distance && distance < max_range) {			
-			auto predicate = [spawn_point](const Vector4 & each_item) {
-				return (each_item.x == spawn_point.x && each_item.y == spawn_point.y && each_item.z == spawn_point.z && each_item.h == spawn_point.h);
-			};
-			bool found_in_exclude_vector = false;
-			if (!vector_of_vector4s_to_exclude.size() == 0) found_in_exclude_vector = (std::find_if(vector_of_vector4s_to_exclude.begin(), vector_of_vector4s_to_exclude.end(), predicate) != vector_of_vector4s_to_exclude.end()); // make sure this_vehicle_position does not already exist in vector_of_vector4s
-			bool occupied = GAMEPLAY::IS_POSITION_OCCUPIED(spawn_point.x, spawn_point.y, spawn_point.z, 3.5f, false, true, true, false, false, false, false);
-			bool occluded = ENTITY::WOULD_ENTITY_BE_OCCLUDED(vehicle_hash, spawn_point.x, spawn_point.y, spawn_point.z, true);
-			if (!occupied && !occluded && !found_in_exclude_vector) {
-				Logger.Write("SelectASpawnPoint(): selected from " + std::to_string(vector_of_vector4s_to_search.size()) + " possible points after " + std::to_string(i+1) + " tries ( " + std::to_string(distance) + " meters )", LogNormal);
-				return spawn_point;
-			}
-			Logger.Write("SelectASpawnPoint(): selected spawn point is either in vector_of_vector4s_to_exclude or occupied/occluded somehow. Try again...", LogVerbose);
+	for (Vector4 each_vector4 : vector4s_to_search) {
+		uint distance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(each_vector4.x, each_vector4.y, each_vector4.z, pedestrian_coordinates.x, pedestrian_coordinates.y, pedestrian_coordinates.z, 0);
+		bool is_between_min_and_max_range = (min_range < distance && distance < max_range);
+		bool occluded = ENTITY::WOULD_ENTITY_BE_OCCLUDED(vehicle_hash, each_vector4.x, each_vector4.y, each_vector4.z, true);
+		bool occupied = GAMEPLAY::IS_POSITION_OCCUPIED(each_vector4.x, each_vector4.y, each_vector4.z, 3.5f, false, true, true, false, false, false, false);
+		bool excluded = false;
+		for (Vector4 exclude_vector4 : vector4s_to_exclude) {
+			if (GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(exclude_vector4.x, exclude_vector4.y, exclude_vector4.z, each_vector4.x, each_vector4.y, each_vector4.z, 0) < 1.0)
+				excluded = true;
 		}
-		WAIT(0);
+		if (is_between_min_and_max_range && !occluded && !occupied && !excluded) {
+			filtered_vector4s.push_back(each_vector4);
+		}
 	}
-	Logger.Write("SelectASpawnPoint(): exceeded " + std::to_string(max_tries) + " tries, returning an empty Vector4!", LogError);
-	return empty_spawn_point;
+	if (filtered_vector4s.size() == 0) { // don't bother continuing with an empty vector.
+		Logger.Write("SelectASpawnPoint(): filtered_vector4s was empty (there were no points that met the criteria), returning an empty Vector4!", LogError);
+		return empty_spawn_point; // remember, can't throw exceptions, ScripHookV intercepts them.
+	}
+	//std::shuffle(filtered_vector4s.begin(), filtered_vector4s.end(), generator); // shuffle the Vector4s - last step before picking one.
+	Vector4 selected_vector4 = filtered_vector4s[GetFromUniformIntDistribution(0, filtered_vector4s.size() - 1)]; // this should be a random point...
+	uint distance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(selected_vector4.x, selected_vector4.y, selected_vector4.z, pedestrian_coordinates.x, pedestrian_coordinates.y, pedestrian_coordinates.z, 0);
+	Logger.Write("SelectASpawnPoint(): selected from " + std::to_string(filtered_vector4s.size()) + " points out of a given set of " + std::to_string(vector4s_to_search.size()) + " ( distance: " + std::to_string(distance) + " meters )", LogNormal);
+	return selected_vector4; 
+	//for (uint i = 0; i < max_tries; i++) {
+	//	Vector4 spawn_point = vector4s_to_search[(rand() % vector4s_to_search.size())]; // pick a random possible point from our set
+	//	float distance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(pedestrian_coordinates.x, pedestrian_coordinates.y, pedestrian_coordinates.z, spawn_point.x, spawn_point.y, spawn_point.z, 0);
+	//	if (min_range < distance && distance < max_range) {			
+	//		auto predicate = [spawn_point](const Vector4 & each_item) {
+	//			return (each_item.x == spawn_point.x && each_item.y == spawn_point.y && each_item.z == spawn_point.z && each_item.h == spawn_point.h);
+	//		};
+	//		bool found_in_exclude_vector = false;
+	//		if (!vector4s_to_exclude.size() == 0) found_in_exclude_vector = (std::find_if(vector4s_to_exclude.begin(), vector4s_to_exclude.end(), predicate) != vector4s_to_exclude.end()); // make sure this_vehicle_position does not already exist in vector_of_vector4s
+	//		bool occupied = GAMEPLAY::IS_POSITION_OCCUPIED(spawn_point.x, spawn_point.y, spawn_point.z, 3.5f, false, true, true, false, false, false, false);
+	//		bool occluded = ENTITY::WOULD_ENTITY_BE_OCCLUDED(vehicle_hash, spawn_point.x, spawn_point.y, spawn_point.z, true);
+	//		if (!occupied && !occluded && !found_in_exclude_vector) {
+	//			Logger.Write("SelectASpawnPoint(): selected from " + std::to_string(vector4s_to_search.size()) + " possible points after " + std::to_string(i+1) + " tries ( " + std::to_string(distance) + " meters )", LogNormal);
+	//			return spawn_point;
+	//		}
+	//		Logger.Write("SelectASpawnPoint(): selected spawn point is either in vector_of_vector4s_to_exclude or occupied/occluded somehow. Try again...", LogVerbose);
+	//	}
+	//	WAIT(0);
+	//}
+	//Logger.Write("SelectASpawnPoint(): exceeded " + std::to_string(max_tries) + " tries, returning an empty Vector4!", LogError);
+	//return empty_spawn_point;
 }
 
 Hash SelectAVehicleModel(std::vector<Hash> vector_of_hashes_to_search, uint vehicle_class_options, uint max_tries) {
