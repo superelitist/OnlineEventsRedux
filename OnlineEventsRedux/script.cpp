@@ -235,7 +235,7 @@ std::vector<Hash> GetVehicleModelsFromWorld(Ped ped, std::vector<Hash> vector_of
 					if (!found) {
 						char *this_vehicle_display_name = VEHICLE::GET_DISPLAY_NAME_FROM_VEHICLE_MODEL(this_vehicle_hash);
 						char *this_vehicle_string_literal = UI::_GET_LABEL_TEXT(this_vehicle_display_name);
-						Logger.Write("GetVehicleModelsFromWorld(): " + std::string(this_vehicle_string_literal), LogVerbose);
+						Logger.Write("GetVehicleModelsFromWorld(): " + std::string(this_vehicle_string_literal), LogVeryVerbose);
 						vector_of_hashes.push_back(this_vehicle_hash);
 					}
 					if (vector_of_hashes.size() > maximum_vector_size) vector_of_hashes.erase(vector_of_hashes.begin()); // also pretty sure there's not more than a thousand models in the game, but safety first...
@@ -404,7 +404,7 @@ Ped SpawnABadGuy(Ped skin, Vector4 crate_spawn_point, float x_margin, float y_ma
 	//AI::TASK_WANDER_STANDARD(bad_guy, 375.0f, 0);
 	//AI::TASK_GUARD_CURRENT_POSITION(bad_guy, 10.0f, 10.0f, 1);
 	float relative_bearing = GetAngleBetween2DCoords(spawn_point.x, spawn_point.y, crate_spawn_point.x, crate_spawn_point.y);
-	Logger.Write("spawn_point.x: " + std::to_string(spawn_point.x) + ", spawn_point.y: " + std::to_string(spawn_point.y) + ", crate_spawn_point.x: " + std::to_string(crate_spawn_point.x) + ", crate_spawn_point.y: " + std::to_string(crate_spawn_point.y) + ", relative_bearing: " + std::to_string(relative_bearing), LogVerbose);
+	Logger.Write("spawn_point.x: " + std::to_string(spawn_point.x) + ", spawn_point.y: " + std::to_string(spawn_point.y) + ", crate_spawn_point.x: " + std::to_string(crate_spawn_point.x) + ", crate_spawn_point.y: " + std::to_string(crate_spawn_point.y) + ", relative_bearing: " + std::to_string(relative_bearing), LogVeryVerbose);
 	Vector3 point_behind = GetCoordinateByOriginBearingAndDistance(spawn_point, relative_bearing-180, 10);
 	AI::TASK_TURN_PED_TO_FACE_COORD(bad_guy, point_behind.x, point_behind.y, point_behind.z, 120000);
 	ENTITY::SET_ENTITY_INVINCIBLE(bad_guy, false);
@@ -444,6 +444,7 @@ MissionType CrateDropMission::Prepare() {
 	// Someday I'll figure out something to expand this. Not today.
 	std::vector<Vector4> empty_vector;
 	crate_spawn_location_ = SelectASpawnPoint(playerPed, crate_spawn_locations, empty_vector, spawn_point_maximum_range, spawn_point_minimum_range, NULL, number_of_tries_to_select_items);
+	Logger.Write("CrateDropMission::Prepare(): crate_spawn_location: ( " + std::to_string(crate_spawn_location_.x) + ", " + std::to_string(crate_spawn_location_.x) + " )", LogNormal);
 	if (crate_spawn_location_.x == 0.0f && crate_spawn_location_.y == 0.0f && crate_spawn_location_.z == 0.0f && crate_spawn_location_.h == 0.0f) return NO_Mission;
 	if (IsTheUniverseFavorable(0.05)) crate_is_special_ = true;
 	crate_blip_ = UI::ADD_BLIP_FOR_COORD(crate_spawn_location_.x, crate_spawn_location_.y, crate_spawn_location_.z);
@@ -464,6 +465,7 @@ MissionType CrateDropMission::Execute() {
 	Vector3 player_coordinates = ENTITY::GET_ENTITY_COORDS(playerPed, 0);
 	int distance_to_crate = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_coordinates.x, player_coordinates.y, player_coordinates.z, crate_spawn_location_.x, crate_spawn_location_.y, crate_spawn_location_.z, 0);
 	if (distance_to_crate < 300 && !objects_were_spawned_) {
+		Logger.Write("CrateDropMission::Execute(): Creating objects...", LogVerbose);
 		STREAMING::REQUEST_MODEL(GAMEPLAY::GET_HASH_KEY("prop_box_ammo04a"));
 		while (!STREAMING::HAS_MODEL_LOADED(GAMEPLAY::GET_HASH_KEY("prop_box_ammo04a"))) WAIT(0);
 		crate_ = OBJECT::CREATE_AMBIENT_PICKUP(0x14568F28, crate_spawn_location_.x, crate_spawn_location_.y, crate_spawn_location_.z, -1, 0, GAMEPLAY::GET_HASH_KEY("prop_box_ammo04a"), 1, 1);
