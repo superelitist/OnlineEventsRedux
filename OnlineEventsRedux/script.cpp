@@ -986,18 +986,6 @@ void MissionHandler::Update() {
 	}
 }
 
-void DumpVectorToFile(std::string filename, std::vector<Vector4> vector) {
-	std::ofstream file_object_ = std::ofstream(filename);
-	if (file_object_.is_open()) {
-		file_object_ << "name,latitude,longitude,altitude,heading" << std::endl;
-		uint number = 1;
-		for (Vector4 v4 : vector) {
-//			Logger.Write("v4.x : " + std::to_string(v4.x), LogExtremelyVerbose);
-			file_object_ << std::setprecision(9) << number++ << "," << v4.x << "," << v4.y << "," << v4.z << "," << v4.h << std::endl;
-		}
-	}
-}
-
 void Update() {
 	Logger.Write("Update()", LogExtremelyVerbose);
 	playerPed = PLAYER::PLAYER_PED_ID();
