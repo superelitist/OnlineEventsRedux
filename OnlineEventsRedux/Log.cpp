@@ -3,6 +3,7 @@
 #include <string>
 #include <Windows.h>
 #include <chrono>
+#include <iomanip>
 //#include <thread>
 
 Log::Log(std::string filename, LogLevel logging_level) {
@@ -23,7 +24,7 @@ void Log::Write(std::string string, LogLevel level) {
 		//if (logging_level_ & level) {
 			log_time_delta_ = GetTickCount64() - log_time_last_;
 			log_time_last_ = GetTickCount64();
-			file_object_ << log_time_delta_ << "	" << level << "	" << string << std::endl;
+			file_object_ << std::left << std::setw(8) << log_time_delta_ << std::left << std::setw(8) << level << "\t" << string << std::endl;
 		}
 	}
 }
