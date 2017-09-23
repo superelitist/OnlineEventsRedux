@@ -36,7 +36,7 @@
     <ProjectGuid>{8D82F34A-1D64-465B-84B1-37F89AD3D20B}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>OnlineEventsReduxRedux</RootNamespace>
-    <ProjectName>OnlineEventsReduxRedux</ProjectName>
+    <ProjectName>OnlineEventsRedux</ProjectName>
     <WindowsTargetPlatformVersion>10.0.15063.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -75,7 +75,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>false</LinkIncremental>
     <TargetExt>.asi</TargetExt>
-    <OutDir>D:\Program Files\Steam\SteamApps\common\Grand Theft Auto V</OutDir>
+    <OutDir>D:\Program Files\Steam\SteamApps\common\Grand Theft Auto V\</OutDir>
     <IntDir>tmp\$(Configuration)\</IntDir>
     <IncludePath>C:\Users\Super Elitist\Dauphin County Library System\OneDrive - Dauphin County Library System\_Scripts\cplusplus\inc;C:\Users\Super\OneDrive - Dauphin County Library System\_Scripts\cplusplus\inc;C:\Users\lbodnyk\OneDrive - Dauphin County Library System\_Scripts\cplusplus\inc;$(IncludePath)</IncludePath>
   </PropertyGroup>
@@ -117,7 +117,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalOptions>..\..\lib\ScriptHookV.lib %(AdditionalOptions)</AdditionalOptions>

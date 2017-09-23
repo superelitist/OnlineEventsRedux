@@ -384,56 +384,18 @@ Hash SelectAVehicleModel(std::vector<Hash> vector_of_hashes_to_search, uint vehi
 	return empty_hash;
 }
 
-Ped SpawnABadGuy(Ped skin, Vector4 crate_spawn_point, float x_margin, float y_margin, float z_margin, char * weapon) {
-	Logger.Write("SpawnABadGuy()", LogExtremelyVerbose);
-	Vector4 spawn_point = crate_spawn_point;
-	spawn_point.x += GetFromUniformRealDistribution(-x_margin, x_margin); spawn_point.y += GetFromUniformRealDistribution(-y_margin, y_margin); spawn_point.z += GetFromUniformRealDistribution(-z_margin, z_margin);
-	Ped bad_guy = PED::CREATE_PED(26, skin, spawn_point.x, spawn_point.y, spawn_point.z, 40, false, true);
-	while (!ENTITY::DOES_ENTITY_EXIST(bad_guy)) WAIT(0);
-	PED::SET_PED_RELATIONSHIP_GROUP_HASH(bad_guy, GAMEPLAY::GET_HASH_KEY("HATES_PLAYER"));
-	if (weapon = "SURPRISE_ME") {
-		if (IsTheUniverseFavorable(0.01)) weapon = "WEAPON_RAILGUN";
-		else if (IsTheUniverseFavorable(0.04)) weapon = "WEAPON_RPG";
-		else if (IsTheUniverseFavorable(0.04)) weapon = "WEAPON_GRENADELAUNCHER";
-		else if (IsTheUniverseFavorable(0.04)) weapon = "WEAPON_MG";
-		else if (IsTheUniverseFavorable(0.12)) weapon = "WEAPON_SNIPERRIFLE";
-		else if (IsTheUniverseFavorable(0.24)) weapon = "WEAPON_CARBINERIFLE";
-		else if (IsTheUniverseFavorable(0.33)) weapon = "WEAPON_SMG";
-		else if (IsTheUniverseFavorable(0.33)) weapon = "WEAPON_PUMPSHOTGUN";
-		else if (IsTheUniverseFavorable(0.24)) weapon = "WEAPON_PISTOL50";
-		else if (IsTheUniverseFavorable(0.24)) weapon = "WEAPON_COMBATPISTOL";
-		else weapon = "WEAPON_PISTOL";
-	}
-	WEAPON::GIVE_DELAYED_WEAPON_TO_PED(bad_guy, GAMEPLAY::GET_HASH_KEY((char *)weapon), 1000, 1);
-	WEAPON::SET_CURRENT_PED_WEAPON(bad_guy, GAMEPLAY::GET_HASH_KEY((char *)weapon), 1);
-
-	//AI::TASK_TURN_PED_TO_FACE_COORD(bad_guy, spawn_point.x, spawn_point.y, spawn_point.z, 5000);
-	//AI::TASK_STAND_STILL(bad_guy, 500);
-	//AI::TASK_WANDER_IN_AREA(bad_guy, spawn_point.x, spawn_point.y, spawn_point.z, 300.0f, 1077936128, 1086324736); // last two values I copped from the native scripts - they're identical in multiple places...
-	//AI::TASK_WANDER_IN_AREA(bad_guy, spawn_point.x, spawn_point.y, spawn_point.z, 375.0f, 100000, 100000); // last two values I copped from the native scripts - they're identical in multiple places...
-	//AI::TASK_WANDER_STANDARD(bad_guy, 375.0f, 0);
-	//AI::TASK_GUARD_CURRENT_POSITION(bad_guy, 10.0f, 10.0f, 1);
-	float relative_bearing = GetAngleBetween2DCoords(spawn_point.x, spawn_point.y, crate_spawn_point.x, crate_spawn_point.y);
-	Logger.Write("spawn_point.x: " + std::to_string(spawn_point.x) + ", spawn_point.y: " + std::to_string(spawn_point.y) + ", crate_spawn_point.x: " + std::to_string(crate_spawn_point.x) + ", crate_spawn_point.y: " + std::to_string(crate_spawn_point.y) + ", relative_bearing: " + std::to_string(relative_bearing), LogVeryVerbose);
-	Vector3 point_behind = GetCoordinateByOriginBearingAndDistance(spawn_point, relative_bearing-180, 10);
-	AI::TASK_TURN_PED_TO_FACE_COORD(bad_guy, point_behind.x, point_behind.y, point_behind.z, 120000);
-	ENTITY::SET_ENTITY_INVINCIBLE(bad_guy, false);
-	return bad_guy;
-}
-
 class CrateDropMission {
 public:
 	MissionType Prepare();
 	MissionType Execute();
 	MissionType Timeout();
 private:
+	Ped SpawnACrateGuard(Ped skin, Vector4 crate_spawn_point, float x_margin, float y_margin, float z_margin, char * weapon);
 	Blip crate_blip_ = NULL;
 	Vector4 crate_spawn_location_;
 	bool crate_is_special_ = false;
 	bool objects_were_spawned_ = false;
 	Object crate_;
-	// Ped guard_1_, guard_2_, guard_3_, guard_4_, guard_5_, guard_6_, guard_7_, guard_8_;
-	//uint number_of_guards_ = number_of_guards;
 	std::vector<Ped> guards_;
 };
 
@@ -454,7 +416,7 @@ MissionType CrateDropMission::Prepare() {
 	// Someday I'll figure out something to expand this. Not today.
 	std::vector<Vector4> empty_vector;
 	crate_spawn_location_ = SelectASpawnPoint(playerPed, crate_spawn_locations, empty_vector, spawn_point_maximum_range, spawn_point_minimum_range, NULL, number_of_tries_to_select_items);
-	Logger.Write("CrateDropMission::Prepare(): crate_spawn_location: ( " + std::to_string(crate_spawn_location_.x) + ", " + std::to_string(crate_spawn_location_.x) + " )", LogNormal);
+	Logger.Write("CrateDropMission::Prepare(): crate_spawn_location: ( " + std::to_string(crate_spawn_location_.x) + ", " + std::to_string(crate_spawn_location_.y) + " )", LogNormal);
 	if (crate_spawn_location_.x == 0.0f && crate_spawn_location_.y == 0.0f && crate_spawn_location_.z == 0.0f && crate_spawn_location_.h == 0.0f) return NO_Mission;
 	if (IsTheUniverseFavorable(0.05)) crate_is_special_ = true;
 	crate_blip_ = UI::ADD_BLIP_FOR_COORD(crate_spawn_location_.x, crate_spawn_location_.y, crate_spawn_location_.z);
@@ -497,7 +459,7 @@ MissionType CrateDropMission::Execute() {
 		uint number_of_guards = number_of_guards_to_spawn;
 		if (crate_is_special_) number_of_guards = round(number_of_guards_to_spawn * 1.5);
 		for (uint i = 0; i < number_of_guards; i++) {
-			guards_.push_back(SpawnABadGuy(skin, crate_spawn_location_, 10, 10, 0, "SURPRISE_ME"));
+			guards_.push_back(SpawnACrateGuard(skin, crate_spawn_location_, 33, 33, 0, "SURPRISE_ME"));
 		}
 		objects_were_spawned_ = true;
 	}
@@ -506,17 +468,7 @@ MissionType CrateDropMission::Execute() {
 		for (Ped guard : guards_) {
 			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard);
 		}
-		/*ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_1_);
-		ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_2_);
-		ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_3_);
-		ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_4_);
-		ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_5_);*/
-		if (crate_is_special_) {
-			/*ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_6_);
-			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_7_);
-			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_8_);*/
-			ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(50000, 150000), mission_reward_modifier);
-		}
+		if (crate_is_special_) ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(50000, 150000), mission_reward_modifier);
 		else ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(25000, 75000), mission_reward_modifier);
 		CreateNotification("The drop was acquired.", play_notification_beeps);
 		return NO_Mission;
@@ -543,6 +495,54 @@ MissionType CrateDropMission::Timeout() {
 		return NO_Mission;
 	}
 	return CrateDrop;
+}
+
+Ped CrateDropMission::SpawnACrateGuard(Ped skin, Vector4 crate_spawn_point, float x_margin, float y_margin, float z_margin, char * weapon) {
+	Logger.Write("SpawnABadGuy()", LogExtremelyVerbose);
+	Vector4 spawn_point = crate_spawn_point;
+	spawn_point.x += GetFromUniformRealDistribution(-x_margin, x_margin); spawn_point.y += GetFromUniformRealDistribution(-y_margin, y_margin); spawn_point.z += GetFromUniformRealDistribution(-z_margin, z_margin);
+	Ped bad_guy = PED::CREATE_PED(26, skin, spawn_point.x, spawn_point.y, spawn_point.z, 40, false, true);
+	while (!ENTITY::DOES_ENTITY_EXIST(bad_guy)) WAIT(0);
+	PED::SET_PED_RELATIONSHIP_GROUP_HASH(bad_guy, GAMEPLAY::GET_HASH_KEY("HATES_PLAYER"));
+	if (weapon = "SURPRISE_ME") {
+		if (IsTheUniverseFavorable(0.01)) weapon = "WEAPON_RAILGUN";
+		else if (IsTheUniverseFavorable(0.04)) weapon = "WEAPON_RPG";
+		else if (IsTheUniverseFavorable(0.04)) weapon = "WEAPON_GRENADELAUNCHER";
+		else if (IsTheUniverseFavorable(0.04)) weapon = "WEAPON_MG";
+		else if (IsTheUniverseFavorable(0.12)) weapon = "WEAPON_SNIPERRIFLE";
+		else if (IsTheUniverseFavorable(0.24)) weapon = "WEAPON_CARBINERIFLE";
+		else if (IsTheUniverseFavorable(0.33)) weapon = "WEAPON_SMG";
+		else if (IsTheUniverseFavorable(0.33)) weapon = "WEAPON_PUMPSHOTGUN";
+		else if (IsTheUniverseFavorable(0.24)) weapon = "WEAPON_PISTOL50";
+		else if (IsTheUniverseFavorable(0.24)) weapon = "WEAPON_COMBATPISTOL";
+		else weapon = "WEAPON_PISTOL";
+	}
+	WEAPON::GIVE_DELAYED_WEAPON_TO_PED(bad_guy, GAMEPLAY::GET_HASH_KEY((char *)weapon), 1000, 1);
+	WEAPON::SET_CURRENT_PED_WEAPON(bad_guy, GAMEPLAY::GET_HASH_KEY((char *)weapon), 1);
+	float relative_bearing = GetAngleBetween2DCoords(spawn_point.x, spawn_point.y, crate_spawn_point.x, crate_spawn_point.y);
+	Logger.Write("spawn_point.x: " + std::to_string(spawn_point.x) + ", spawn_point.y: " + std::to_string(spawn_point.y) + ", crate_spawn_point.x: " + std::to_string(crate_spawn_point.x) + ", crate_spawn_point.y: " + std::to_string(crate_spawn_point.y) + ", relative_bearing: " + std::to_string(relative_bearing), LogVeryVerbose);
+	Vector3 point_behind = GetCoordinateByOriginBearingAndDistance(spawn_point, relative_bearing - 180, 10);
+	AI::TASK_TURN_PED_TO_FACE_COORD(bad_guy, point_behind.x, point_behind.y, point_behind.z, 120000);
+
+	//AI::OPEN_PATROL_ROUTE("miss_Ass0");
+	//AI::ADD_PATROL_ROUTE_NODE(0, "WORLD_HUMAN_GUARD_STAND", spawn_point.x + GetFromUniformRealDistribution(-x_margin, x_margin), spawn_point.y + GetFromUniformRealDistribution(-y_margin, y_margin), spawn_point.z + GetFromUniformRealDistribution(-z_margin, z_margin), 0.0, 0.0, 0.0, GAMEPLAY::GET_RANDOM_INT_IN_RANGE(1000, 2000));
+	//AI::ADD_PATROL_ROUTE_NODE(1, "WORLD_HUMAN_GUARD_STAND", spawn_point.x + GetFromUniformRealDistribution(-x_margin, x_margin), spawn_point.y + GetFromUniformRealDistribution(-y_margin, y_margin), spawn_point.z + GetFromUniformRealDistribution(-z_margin, z_margin), 0.0, 0.0, 0.0, GAMEPLAY::GET_RANDOM_INT_IN_RANGE(1000, 2000));
+	//AI::ADD_PATROL_ROUTE_NODE(2, "WORLD_HUMAN_GUARD_STAND", spawn_point.x + GetFromUniformRealDistribution(-x_margin, x_margin), spawn_point.y + GetFromUniformRealDistribution(-y_margin, y_margin), spawn_point.z + GetFromUniformRealDistribution(-z_margin, z_margin), 0.0, 0.0, 0.0, GAMEPLAY::GET_RANDOM_INT_IN_RANGE(1000, 2000));
+	//AI::ADD_PATROL_ROUTE_LINK(0, 1);
+	//AI::ADD_PATROL_ROUTE_LINK(1, 2);
+	//AI::ADD_PATROL_ROUTE_LINK(2, 0);
+	//AI::CLOSE_PATROL_ROUTE();
+	//AI::CREATE_PATROL_ROUTE();
+	//AI::TASK_PATROL(bad_guy, "miss_Ass0", 1, 1, 1);
+
+	//AI::TASK_STAND_STILL(bad_guy, 500);
+	//AI::TASK_WANDER_IN_AREA(bad_guy, spawn_point.x, spawn_point.y, spawn_point.z, 300.0f, 1077936128, 1086324736); // last two values I copped from the native scripts - they're identical in multiple places...
+	//AI::TASK_WANDER_IN_AREA(bad_guy, spawn_point.x, spawn_point.y, spawn_point.z, 33.0f, 1, 1);
+	//AI::TASK_WANDER_STANDARD(bad_guy, 375.0f, 0);
+	//AI::TASK_GUARD_CURRENT_POSITION(bad_guy, 10.0f, 10.0f, 1);
+
+	ENTITY::SET_ENTITY_INVINCIBLE(bad_guy, false);
+	return bad_guy;
 }
 
 class ArmoredTruckMission {
@@ -597,14 +597,15 @@ MissionType ArmoredTruckMission::Execute() {
 	}
 	if (PED::IS_PED_IN_VEHICLE(playerPed, armored_truck_, 0)) {
 		WAIT(500);
-		VEHICLE::SET_VEHICLE_DOOR_OPEN(armored_truck_, 3, true, true); // maybe these?
-		VEHICLE::SET_VEHICLE_DOOR_OPEN(armored_truck_, 2, true, true);
-		//VEHICLE::SET_VEHICLE_DOOR_OPEN(armored_truck_, 6, true, true); // maybe these?
-		//VEHICLE::SET_VEHICLE_DOOR_OPEN(armored_truck_, 7, true, true);
+		//VEHICLE::SET_VEHICLE_DOOR_OPEN(armored_truck_, 3, true, true); // maybe these?
+		//VEHICLE::SET_VEHICLE_DOOR_OPEN(armored_truck_, 2, true, true);
+		VEHICLE::SET_VEHICLE_DOOR_CONTROL(armored_truck_, 2, 1, 0.666);
+		VEHICLE::SET_VEHICLE_DOOR_CONTROL(armored_truck_, 3, 1, 0.666);
 	}
-	if (VEHICLE::IS_VEHICLE_DOOR_FULLY_OPEN(armored_truck_, 2) || VEHICLE::IS_VEHICLE_DOOR_FULLY_OPEN(armored_truck_, 3)) {
+	//if (VEHICLE::IS_VEHICLE_DOOR_FULLY_OPEN(armored_truck_, 2) || VEHICLE::IS_VEHICLE_DOOR_FULLY_OPEN(armored_truck_, 3)) {
+	if ((VEHICLE::GET_VEHICLE_DOOR_ANGLE_RATIO(armored_truck_, 2) > 0.5) || (VEHICLE::GET_VEHICLE_DOOR_ANGLE_RATIO(armored_truck_, 3) > 0.5)) {
 		Pickup case1; Pickup case2; Pickup case3;
-		Vector3 behind_truck = GetCoordinateByOriginBearingAndDistance(truck_position, truck_position.h+270, 3.33f);
+		Vector3 behind_truck = GetCoordinateByOriginBearingAndDistance(truck_position, truck_position.h+270, 4.44f);
 		int random = rand() % 3;
 		switch (random) { // falls through!
 		case 0:
@@ -925,6 +926,58 @@ MissionType StealVehicleMission::Timeout() {
 	return StealVehicle;
 }
 
+class EnemyHandler {
+public:
+	int SpawnAnEnemyPlayer(Vector4 spawn_point, char * skin = "mp_g_m_pros_01", float x_margin = 1.0, float y_margin = 1.0, float z_margin = 1.0, char * weapon = "SURPRISE_ME");
+private:
+	std::vector<Ped> enemy_peds_;
+};
+
+int EnemyHandler::SpawnAnEnemyPlayer(Vector4 origin_vector, char * skin, float x_margin, float y_margin, float z_margin, char * weapon)
+{
+	Logger.Write("SpawnAnEnemyPlayer()", LogExtremelyVerbose);
+	Vector4 spawn_point = origin_vector;
+	origin_vector.x += GetFromUniformRealDistribution(-x_margin, x_margin); origin_vector.y += GetFromUniformRealDistribution(-y_margin, y_margin); origin_vector.z += GetFromUniformRealDistribution(-z_margin, z_margin);
+	Ped skin_hash_key = GAMEPLAY::GET_HASH_KEY(skin);
+	STREAMING::REQUEST_MODEL(skin_hash_key);
+	Ped this_ped = PED::CREATE_PED(26, skin_hash_key, origin_vector.x, origin_vector.y, origin_vector.z, 0, false, true);
+	while (!ENTITY::DOES_ENTITY_EXIST(this_ped)) WAIT(0);
+	PED::SET_PED_RELATIONSHIP_GROUP_HASH(this_ped, GAMEPLAY::GET_HASH_KEY("HATES_PLAYER"));
+	
+	if (weapon != "NONE") {
+		if (weapon == "SURPRISE_ME") {
+			if (IsTheUniverseFavorable(0.01)) weapon = "WEAPON_RAILGUN";
+			else if (IsTheUniverseFavorable(0.04)) weapon = "WEAPON_RPG";
+			else if (IsTheUniverseFavorable(0.04)) weapon = "WEAPON_GRENADELAUNCHER";
+			else if (IsTheUniverseFavorable(0.04)) weapon = "WEAPON_MG";
+			else if (IsTheUniverseFavorable(0.12)) weapon = "WEAPON_SNIPERRIFLE";
+			else if (IsTheUniverseFavorable(0.24)) weapon = "WEAPON_CARBINERIFLE";
+			else if (IsTheUniverseFavorable(0.33)) weapon = "WEAPON_SMG";
+			else if (IsTheUniverseFavorable(0.33)) weapon = "WEAPON_PUMPSHOTGUN";
+			else if (IsTheUniverseFavorable(0.24)) weapon = "WEAPON_PISTOL50";
+			else if (IsTheUniverseFavorable(0.24)) weapon = "WEAPON_COMBATPISTOL";
+			else weapon = "WEAPON_PISTOL";
+		}
+		try {
+			WEAPON::GIVE_DELAYED_WEAPON_TO_PED(this_ped, GAMEPLAY::GET_HASH_KEY((char *)weapon), 1000, 1);
+			WEAPON::SET_CURRENT_PED_WEAPON(this_ped, GAMEPLAY::GET_HASH_KEY((char *)weapon), 1);
+		}
+		catch (...) {
+			Logger.Write("SpawnAnEnemyPlayer(): exception adding a weapon! Probably the string was not a valid weapon!", LogError);
+		}
+		
+	}
+	PED::SET_PED_ARMOUR(this_ped, 100);
+	PED::SET_PED_ACCURACY(this_ped, 33);
+
+
+	ENTITY::SET_ENTITY_INVINCIBLE(this_ped, false);
+	int this_ped_position_in_vector = enemy_peds_.size();
+	enemy_peds_.push_back(this_ped);
+	return this_ped_position_in_vector;
+}
+
+
 class MissionHandler {
 public:
 	void Update();
@@ -950,7 +1003,8 @@ void MissionHandler::Update() {
 	tick_count_at_last_update_ = GetTickCount64();
 
 	if (ticks_since_last_mission_ > ticks_between_missions_) { // Enough time has passed that we can start a new mission.
-		current_mission_type_ = MissionType(rand() % MAX_Mission); // I used to think this was silly. Now I think it's awesome.
+		//current_mission_type_ = MissionType(rand() % MAX_Mission); // I used to think this was silly. Now I think it's awesome.
+		current_mission_type_ = CrateDrop;
 		switch (current_mission_type_) {
 		case StealVehicle	:	current_mission_type_ = StealVehicleMission.Prepare();		break; // Prepare()s should return their MissionType on success.
 		case DestroyVehicle	:	current_mission_type_ = DestroyVehicleMission.Prepare();	break; // If something goes wrong (StealVehicleMission takes too
@@ -1113,3 +1167,5 @@ void ScriptMain() {
 
 	Logger.Close(); // I don't think this will ever happen...
 }
+
+
