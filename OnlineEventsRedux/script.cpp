@@ -1131,7 +1131,7 @@ void GetSettingsFromIniFile() {
 	play_notification_beeps = Reader.ReadBoolean("Options", "play_notification_beeps", true);
 	use_default_blip = Reader.ReadBoolean("Options", "use_default_blip", false);
 	mission_timeout = std::max(Reader.ReadInteger("Options", "mission_timeout", 360), 180);
-	mission_cooldown = std::max(Reader.ReadInteger("Options", "mission_cooldown", 60), 5);
+	mission_cooldown = std::max(Reader.ReadInteger("Options", "mission_cooldown", 60), 30);
 	spawn_point_minimum_range = Reader.ReadInteger("Options", "spawn_point_minimum_range", 1000);
 	spawn_point_maximum_range = Reader.ReadInteger("Options", "spawn_point_maximum_range", 3000);
 	mission_minimum_range_for_timeout = Reader.ReadInteger("Options", "mission_minimum_range_for_timeout", 333);
