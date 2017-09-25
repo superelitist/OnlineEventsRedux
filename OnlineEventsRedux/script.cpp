@@ -16,6 +16,8 @@
 #include <sstream>
 #include <vector>
 #include <set>
+#include <chrono>
+#include <ratio>
 
 CIniReader Reader(".\\OnlineEventsRedux.ini");
 Log Logger(".\\OnlineEventsRedux.log", LogNormal);
@@ -41,7 +43,7 @@ std::vector<Vector4> crate_spawn_points;
 std::vector<Vector4> special_marker_points;
 std::vector<Hash> possible_vehicle_models;
 std::set<Blip> crate_spawn_blips;
-
+uint DEBUG_milliseconds_above_which_to_warn = 1;
 
 // preference options
 bool play_notification_beeps, use_default_blip;
@@ -282,12 +284,12 @@ std::vector<Hash> GetVehicleModelsFromWorld(Ped ped, std::vector<Hash> vector_of
 
 std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vector4> vector_of_vector4s, int maximum_vector_size, int search_range_minimum) {
 	Logger.Write("GetParkedCarsFromWorld()", LogExtremelyVerbose);
+	std::chrono::high_resolution_clock::time_point tick_count_at_search_start = std::chrono::high_resolution_clock::now();
 	const int ARR_SIZE = 1024;
 	Vehicle all_world_vehicles[ARR_SIZE];
 	int count = worldGetAllVehicles(all_world_vehicles, ARR_SIZE);
 	if (all_world_vehicles != NULL) {
 		for (int i = 0; i < count; i++) {
-			WAIT(0);
 			if (DoesEntityExistAndIsNotNull(all_world_vehicles[i])) {
 				Vehicle this_vehicle = all_world_vehicles[i];
 				Vector4 this_vehicle_position = { GetVector4OfEntity(this_vehicle) };
@@ -303,8 +305,10 @@ std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vector4> ve
 					// CHECK WHETHER THERE IS A BLIP AT THIS POSITION
 					// CHECK WHETHER THERE IS A BLIP AT THIS POSITION
 					// CHECK WHETHER THERE IS A BLIP AT THIS POSITION
+					WAIT(0); // The ifs should be fast, but comparing ~150 vehicles in the game world to upwards of 4000 spawn points actually takes appreciable time. WAIT(0) hands control back to the game engine for a tick, making sure we don't slow the game down.
 					auto predicate = [this_vehicle_position](const Vector4 & item) { // didn't want to define a lambda inline, it gets ugly fast.
 						bool too_close_to_another_point = (GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(item.x, item.y, item.z, this_vehicle_position.x, this_vehicle_position.y, this_vehicle_position.z, 0) < 1.0);
+						//WAIT(0);
 						return (too_close_to_another_point);
 					};
 					bool found_in_vector = (std::find_if(vector_of_vector4s.begin(), vector_of_vector4s.end(), predicate) != vector_of_vector4s.end()); // make sure this_vehicle_position does not already exist in vector_of_vector4s
@@ -322,6 +326,14 @@ std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vector4> ve
 			}
 		}
 	}
+	std::chrono::high_resolution_clock::time_point tick_count_at_search_end = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(tick_count_at_search_end - tick_count_at_search_start);
+	float ticks_taken_to_complete_search = time_span.count() * 1000;
+	if (ticks_taken_to_complete_search > DEBUG_milliseconds_above_which_to_warn) {
+		Logger.Write("GetParkedCarsFromWorld(): ticks_taken_to_complete_search: " + std::to_string(ticks_taken_to_complete_search) + ", all_world_vehicles: " + std::to_string(count) + ", vector_of_vector4s.size(): " + std::to_string(vector_of_vector4s.size()), LogVerbose);
+		DEBUG_milliseconds_above_which_to_warn = ticks_taken_to_complete_search;
+	}
+	
 	return vector_of_vector4s;
 }
 
@@ -1419,7 +1431,7 @@ void GetSettingsFromIniFile() {
 	mission_reward_modifier = Reader.ReadFloat("Options", "mission_reward_modifier", 1.0f);
 	destroyable_vehicle_classes = Reader.ReadInteger("Options", "destroyable_vehicle_flags", SUV | Muscle | OffRoad | Motorcycle);
 	stealable_vehicle_classes = Reader.ReadInteger("Options", "stealable_vehicle_flags", Compact | Sedan | SUV | Coupe | Muscle | SportsClassic | Sports | Super | Motorcycle | OffRoad);
-	number_of_guards_to_spawn = std::min(Reader.ReadInteger("Options", "number_of_guards_to_spawn", 6), 12);
+	number_of_guards_to_spawn = std::min(Reader.ReadInteger("Options", "number_of_guards_to_spawn", 4), 12);
 	// DEBUG
 	logging_level = LogLevel (std::max(Reader.ReadInteger("Debug", "logging_level", 1), 1)); // right now at least, I don't want to let anyone turn logging entirely off.
 	seconds_to_wait_for_vehicle_persistence_scripts = Reader.ReadInteger("Debug", "seconds_to_wait_for_vehicle_persistence_scripts", 0);
