@@ -17,9 +17,6 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ConsoleApplication1", "ConsoleApplication1\ConsoleApplication1.vcxproj", "{690C4C88-3774-441F-9AAE-9F64A3201602}"
 EndProject
 Global
-	GlobalSection(Performance) = preSolution
-		HasPerformanceSessions = true
-	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
 		Debug|x86 = Debug|x86
@@ -33,8 +30,8 @@ Global
 		{8D82F34A-1D64-465B-84B1-37F89AD3D20B}.Release|x64.ActiveCfg = Release|x64
 		{8D82F34A-1D64-465B-84B1-37F89AD3D20B}.Release|x64.Build.0 = Release|x64
 		{8D82F34A-1D64-465B-84B1-37F89AD3D20B}.Release|x86.ActiveCfg = Release|x64
-		{690C4C88-3774-441F-9AAE-9F64A3201602}.Debug|x64.ActiveCfg = Release|x64
-		{690C4C88-3774-441F-9AAE-9F64A3201602}.Debug|x64.Build.0 = Release|x64
+		{690C4C88-3774-441F-9AAE-9F64A3201602}.Debug|x64.ActiveCfg = Debug|x64
+		{690C4C88-3774-441F-9AAE-9F64A3201602}.Debug|x64.Build.0 = Debug|x64
 		{690C4C88-3774-441F-9AAE-9F64A3201602}.Debug|x86.ActiveCfg = Debug|Win32
 		{690C4C88-3774-441F-9AAE-9F64A3201602}.Debug|x86.Build.0 = Debug|Win32
 		{690C4C88-3774-441F-9AAE-9F64A3201602}.Release|x64.ActiveCfg = Release|x64
@@ -47,6 +44,9 @@ Global
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9D0EE87F-6C64-49BA-B918-2161130A7149}
+	EndGlobalSection
+	GlobalSection(Performance) = preSolution
+		HasPerformanceSessions = true
 	EndGlobalSection
 	GlobalSection(Performance) = preSolution
 		HasPerformanceSessions = true

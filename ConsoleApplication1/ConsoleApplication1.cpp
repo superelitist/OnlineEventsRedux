@@ -49,30 +49,19 @@ unsigned long hash(unsigned char *str) {
 
 int main()
 {
+	string input_line;
 	const float f = 1.0 + 1.5 + 1.75;
 	unsigned char b[sizeof(float)];
 	memcpy(b, &f, sizeof(f));
 	unsigned long result = ::hash(b);
-	file.open(".\\OnlineEventsRedux.xyz", fstream::in | fstream::out | fstream::app);
 	srand(GetTickCount64());
 	string line;
 	vector<string> vector;
-	vector.push_back("120");
-	vector.push_back("130");
-	vector.push_back("140");
-	vector.push_back("150");
-
-	for (auto guard : vector) {
-		//cout << "enter a number: ";
-		//cin >> line;
-		//guard = guard + line;
-		//cout << "for (int guard : ints) " << to_string(guard) << endl;
-		//cout << " you entered: " << line << endl;
-	}
-	//repeat(12, [] {cout << "l"; });
-	//cout << "vector size: " << std::to_string(vector.size()) << endl;
-	//cout << "GetFromUniformIntDistribution(): " << vector[GetFromUniformIntDistribution(0,vector.size()-1)];
-	//cout << vector[GetFromUniformIntDistribution(0, static_cast<int>(vector.size() - 1))] << endl;
 
 
+	bool this_statement_is_true = true;
+
+
+	getline(cin, input_line);
+	cout << "this_statement_is_true:" << std::to_string(this_statement_is_true);
 }
