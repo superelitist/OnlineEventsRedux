@@ -18,6 +18,7 @@
 #include <set>
 #include <chrono>
 #include <ratio>
+#include <numeric>
 
 CIniReader Reader(".\\OnlineEventsRedux.ini");
 Log Logger(".\\OnlineEventsRedux.log", LogNormal);
@@ -33,6 +34,7 @@ std::ofstream crate_spawn_file;
 // GAMEPLAY::GET_HEADING_FROM_VECTOR_2D
 
 std::random_device random_device; std::mt19937 generator(random_device()); // init a standard mersenne_twister_engine
+uint times_waited = 0;
 
 Player player;
 Ped player_ped;
@@ -59,6 +61,20 @@ LogLevel logging_level;
 uint seconds_to_wait_for_vehicle_persistence_scripts, vehicle_search_range_minimum;
 uint maximum_number_of_spawn_points, maximum_number_of_vehicle_models, distance_to_draw_spawn_points;
 bool dump_parked_cars_to_xyz_file;
+
+Hash crate_hash;
+Entity crate;
+Blip crate_blip;
+
+inline void Wait(uint milliseconds) {
+	times_waited += 1;
+	WAIT(milliseconds);
+}
+
+inline bool FileExists(const std::string& name) {
+	struct stat buffer;
+	return (stat(name.c_str(), &buffer) == 0);
+}
 
 bool IsControlPressed(eControl control) {
 	return CONTROLS::IS_DISABLED_CONTROL_PRESSED(2, control);
@@ -97,10 +113,11 @@ Vector4 GetVector4OfEntity(Entity entity) {
 }
 
 Vector3 GetCoordinateByOriginBearingAndDistance(Vector4 v4, float bearing, float distance) {
-	Vector3 v3;	v3.x = v4.x + cos((bearing)*radian) * distance; v3.y = v4.y + sin((bearing)*radian) * distance; v3.z = v4.z;
+	//Vector3 v3;	
+	//v3.x = v4.x + cos((bearing)*radian) * distance; v3.y = v4.y + sin((bearing)*radian) * distance; v3.z = v4.z;
 	Vector3 result = Vector3{ static_cast<float>(v4.x + cos((bearing)*radian) * distance), 0 , static_cast<float>(v4.y + sin((bearing)*radian) * distance), 0, static_cast<float>(v4.z), 0 };
-	Logger.Write("GetCoordinatesByOriginBearingAndDistance( (" + std::to_string(v4.x) + ", " + std::to_string(v4.y) + ", " + std::to_string(v4.z) + "), " + std::to_string(bearing) + std::to_string(distance) 
-																				+ " ): (" + std::to_string(result.x) + ", " + std::to_string(result.y) + ", " + std::to_string(result.z) + " )", LogVerbose);
+	Logger.Write("GetCoordinatesByOriginBearingAndDistance( (" + std::to_string(v4.x) + ", " + std::to_string(v4.y) + ", " + std::to_string(v4.z) + "), " + std::to_string(bearing) + ", " + std::to_string(distance) 
+																				+ " ): (" + std::to_string(result.x) + ", " + std::to_string(result.y) + ", " + std::to_string(result.z) + " )", LogDebug);
 	return result;
 }
 
@@ -109,13 +126,13 @@ double GetAngleBetween2DCoords(float ax, float ay, float bx, float by) {
 	float y_diff = by - ay;
 	double theta = atan2(y_diff, x_diff);
 	double result = theta / radian;
-	Logger.Write("GetAngleBetween2DCoords( " + std::to_string(ax) + ", " + std::to_string(ay) + ", " + std::to_string(bx) + ", " + std::to_string(by) + " ): " + std::to_string(result), LogVerbose);
+	Logger.Write("GetAngleBetween2DCoords( " + std::to_string(ax) + ", " + std::to_string(ay) + ", " + std::to_string(bx) + ", " + std::to_string(by) + " ): " + std::to_string(result), LogDebug);
 	return result;
 }
 
 double GetDistanceBetween2DCoords(float ax, float ay, float bx, float by) {
 	double result = std::hypot(bx - ax, by - ay);
-	Logger.Write("GetDistanceBetween2DCoords( " + std::to_string(ax) + ", " + std::to_string(ay) + ", " + std::to_string(bx) + ", " + std::to_string(by) + " ): " + std::to_string(result), LogVerbose);
+	//Logger.Write("GetDistanceBetween2DCoords( " + std::to_string(ax) + ", " + std::to_string(ay) + ", " + std::to_string(bx) + ", " + std::to_string(by) + " ): " + std::to_string(result), LogVerbose);
 	return result;
 }
 
@@ -126,10 +143,10 @@ float GetGroundZAtThisLocation(Vector4 v4) {
 	}
 	float ground_z0;
 	(GAMEPLAY::GET_GROUND_Z_FOR_3D_COORD(v4.x, v4.y, v4.z, &ground_z0, 0));
-	WAIT(0);
+	Wait(0);
 	if (ground_z0 == 0) {
 		v4.z += 1.0f;
-		//WAIT(0);
+		//Wait(0);
 		ground_z0 = GetGroundZAtThisLocation(v4);
 	}
 	std::stringstream ss; ss << std::fixed << std::setprecision(2) << "GetGroundZAtThisLocation(" << v4.x << ", " << v4.y << ", " << v4.z << ") GroundZ(0): " << ground_z0; Logger.Write(ss.str(), LogDebug);
@@ -140,20 +157,20 @@ double GetFromUniformRealDistribution(double first, double second) {
 	
 	std::uniform_real_distribution<> uniform_real_distribution(first, second);
 	double result =  uniform_real_distribution(generator);
-	Logger.Write("GetFromUniformRealDistribution( " + std::to_string(first) + ", " + std::to_string(second) + " ): " + std::to_string(result), LogVerbose);
+	Logger.Write("GetFromUniformRealDistribution( " + std::to_string(first) + ", " + std::to_string(second) + " ): " + std::to_string(result), LogDebug);
 	return result;
 }
 
 int GetFromUniformIntDistribution(int first, int second) {
 	std::uniform_int_distribution<> uniform_int_distribution(first, second);
 	int result = uniform_int_distribution(generator);
-	Logger.Write("GetFromUniformIntDistribution( " + std::to_string(first) + ", " + std::to_string(second) + " ): " + std::to_string(result), LogVerbose);
+	Logger.Write("GetFromUniformIntDistribution( " + std::to_string(first) + ", " + std::to_string(second) + " ): " + std::to_string(result), LogDebug);
 	return result;
 }
 
 bool IsTheUniverseFavorable(float probability) {
 	bool result = (GetFromUniformRealDistribution(0, 1) <= probability);
-	Logger.Write("IsTheUniverseFavorable(" + std::to_string(probability) + "): " + (result ? "Yes" : "No"), LogVerbose);
+	Logger.Write("IsTheUniverseFavorable(" + std::to_string(probability) + "): " + (result ? "Yes" : "No"), LogDebug);
 	return result;
 }
 
@@ -178,9 +195,8 @@ Hash GetHashOfVehicleModel(Vehicle vehicle) {
 }
 
 int GetVehicleClassBitwiseFromHash(Hash hash) {
-	Logger.Write("GetVehicleClassFromHash()", LogLudicrous);
 	int raw_int = VEHICLE::GET_VEHICLE_CLASS_FROM_NAME(hash);
-	Logger.Write("GetVehicleClassFromHash(): " + std::string(VehicleClasses[raw_int]), LogVerbose); // from strings.h because c++ sucks at some things.
+	Logger.Write("GetVehicleClassBitwiseFromHash(): " + std::string(VehicleClasses[raw_int]), LogDebug); // from strings.h because c++ sucks at some things.
 	switch (raw_int) {
 	case  0: return Compact;
 	case  1: return Sedan;
@@ -295,7 +311,7 @@ std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vector4> ve
 					if (ticks_taken_by_search_so_far > 15.0f) {
 						std::chrono::high_resolution_clock::time_point time_point_at_this_loop_instance = std::chrono::high_resolution_clock::now();
 						//times_waited += 1;
-						WAIT(0); // The ifs should be fast, but comparing ~150 vehicles in the game world to upwards of 4000 spawn points actually takes appreciable time. WAIT(0) hands control back to the game engine for a tick, making sure we don't slow the game down.
+						Wait(0); // The ifs should be fast, but comparing ~150 vehicles in the game world to upwards of 4000 spawn points actually takes appreciable time. Wait(0) hands control back to the game engine for a tick, making sure we don't slow the game down.
 					}
 
 					auto predicate = [this_vehicle_position](const Vector4 & item) { // didn't want to define a lambda inline, it gets ugly fast.
@@ -317,8 +333,8 @@ std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vector4> ve
 			}
 		}
 	}
-	std::chrono::high_resolution_clock::time_point tick_count_at_search_end = std::chrono::high_resolution_clock::now();
-	std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(tick_count_at_search_end - time_point_at_search_start);
+	std::chrono::high_resolution_clock::time_point time_point_at_search_end = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(time_point_at_search_end - time_point_at_search_start);
 	float ticks_taken_to_complete_search = time_span.count() * 1000;
 	//if (times_waited > DEBUG_waits_above_which_to_warn) {
 	//	Logger.Write("GetParkedCarsFromWorld(): times_waited:" + std::to_string(times_waited) + ",  time to complete: " + std::to_string(ticks_taken_to_complete_search) + ",  vehicles: " + std::to_string(count) + ",  vector size: " + std::to_string(vector_of_vector4s.size()), LogDebug);
@@ -383,6 +399,7 @@ Hash SelectAVehicleModel(std::vector<Hash> vector_of_hashes_to_search, uint vehi
 	char *this_vehicle_display_name = VEHICLE::GET_DISPLAY_NAME_FROM_VEHICLE_MODEL(selected_hash);
 	char *this_vehicle_string_literal = UI::_GET_LABEL_TEXT(this_vehicle_display_name);
 	Logger.Write("SelectAVehicleModel(): selected a model from " + std::to_string(filtered_hashes.size()) + " valid hashes using a given set of " + std::to_string(vector_of_hashes_to_search.size()) + " ( " + std::string(this_vehicle_string_literal) + " )", LogNormal);
+	return selected_hash;
 }
 
 Ped SpawnACrateGuard(Ped skin, Vector4 crate_spawn_point, float x_margin, float y_margin, float z_margin, char * weapon) {
@@ -405,7 +422,7 @@ Ped SpawnACrateGuard(Ped skin, Vector4 crate_spawn_point, float x_margin, float 
 	}	
 	Ped bad_guy = PED::CREATE_PED(26, skin, spawn_point.x, spawn_point.y, spawn_point.z, 40, false, true);
 	OBJECT::PLACE_OBJECT_ON_GROUND_PROPERLY(bad_guy);
-	while (!ENTITY::DOES_ENTITY_EXIST(bad_guy)) WAIT(0);
+	while (!ENTITY::DOES_ENTITY_EXIST(bad_guy)) Wait(0);
 	PED::SET_PED_RELATIONSHIP_GROUP_HASH(bad_guy, GAMEPLAY::GET_HASH_KEY("HATES_PLAYER"));
 	if (weapon = "SURPRISE_ME") {
 		if (IsTheUniverseFavorable(0.005)) weapon = "WEAPON_RAILGUN";
@@ -461,6 +478,7 @@ private:
 	Object crate_;
 	std::set<Ped> guards_;
 	Ped skin_ = GAMEPLAY::GET_HASH_KEY("mp_g_m_pros_01");
+	Hash crate_hash_ = GAMEPLAY::GET_HASH_KEY("prop_box_ammo04a");
 };
 
 MissionType CrateDropMission::Prepare() {
@@ -489,11 +507,14 @@ MissionType CrateDropMission::Execute() {
 	if (distance_to_crate < 300 && !objects_were_spawned_) {
 		Logger.Write("CrateDropMission::Execute(): Creating objects...", LogVerbose);
 		STREAMING::REQUEST_MODEL(GAMEPLAY::GET_HASH_KEY("prop_box_ammo04a"));
-		while (!STREAMING::HAS_MODEL_LOADED(GAMEPLAY::GET_HASH_KEY("prop_box_ammo04a"))) WAIT(0);
-		crate_ = OBJECT::CREATE_AMBIENT_PICKUP(0x14568F28, crate_spawn_location_.x, crate_spawn_location_.y, crate_spawn_location_.z, -1, 0, GAMEPLAY::GET_HASH_KEY("prop_box_ammo04a"), 1, 1);
+		while (!STREAMING::HAS_MODEL_LOADED(GAMEPLAY::GET_HASH_KEY("prop_box_ammo04a"))) Wait(0);
+		crate_ = OBJECT::CREATE_AMBIENT_PICKUP(0x14568F28, crate_spawn_location_.x, crate_spawn_location_.y, crate_spawn_location_.z+1, -1, 0, crate_hash_, 1, 1);
 		ENTITY::SET_ENTITY_ALPHA(crate_, 255, 1);
-		while (ENTITY::GET_ENTITY_HEIGHT(crate_, crate_spawn_location_.x, crate_spawn_location_.y, crate_spawn_location_.z, 1, 1) > 0) OBJECT::PLACE_OBJECT_ON_GROUND_PROPERLY(crate_);
-		ENTITY::FREEZE_ENTITY_POSITION(crate_, 1);
+		STREAMING::REQUEST_COLLISION_FOR_MODEL(crate_hash_);
+		while (!STREAMING::HAS_COLLISION_FOR_MODEL_LOADED(crate_hash_)) Wait(0);
+		ENTITY::SET_ENTITY_COLLISION(crate_, true, true); // 1A9205C1B9EE827F 139FD37D
+		//while (ENTITY::GET_ENTITY_HEIGHT(crate_, crate_spawn_location_.x, crate_spawn_location_.y, crate_spawn_location_.z, 1, 1) > 0) OBJECT::PLACE_OBJECT_ON_GROUND_PROPERLY(crate_);
+		//ENTITY::FREEZE_ENTITY_POSITION(crate_, 1);
 		UI::REMOVE_BLIP(&crate_blip_);
 		crate_blip_ = UI::ADD_BLIP_FOR_ENTITY(crate_);
 		if (use_default_blip) UI::SET_BLIP_SPRITE(crate_blip_, 1);
@@ -510,7 +531,7 @@ MissionType CrateDropMission::Execute() {
 		
 		STREAMING::REQUEST_MODEL(skin_);
 		//Logger.Write("CrateDropMission::Execute(): requested model of bad guy", LogNormal);
-		while (!STREAMING::HAS_MODEL_LOADED(skin_)) WAIT(0);
+		while (!STREAMING::HAS_MODEL_LOADED(skin_)) Wait(0);
 		//Logger.Write("CrateDropMission::Execute(): model has loaded", LogNormal);
 		uint number_of_guards = number_of_guards_to_spawn;
 		if (crate_is_special_) number_of_guards = round(number_of_guards_to_spawn * 1.5);
@@ -546,7 +567,7 @@ MissionType CrateDropMission::Execute() {
 		}
 		for (uint i = 0; i < num_guard_to_respawn; i++) {
 			STREAMING::REQUEST_MODEL(skin_);
-			while (!STREAMING::HAS_MODEL_LOADED(skin_)) WAIT(0);
+			while (!STREAMING::HAS_MODEL_LOADED(skin_)) Wait(0);
 			guards_.insert(SpawnACrateGuard(skin_, crate_spawn_location_, 40, 40, 40, "SURPRISE_ME"));
 		}
 	}
@@ -612,19 +633,19 @@ MissionType ArmoredTruckMission::Prepare() {
 
 	Vector3 closest_vehicle_node; float closest_vehicle_node_heading;
 	PATHFIND::GET_CLOSEST_VEHICLE_NODE_WITH_HEADING(vehicle_spawn_position.x, vehicle_spawn_position.y, vehicle_spawn_position.z, &closest_vehicle_node, &closest_vehicle_node_heading, 1, 3.0f, 0.0f);
-	WAIT(0);
+	Wait(0);
 	vehicle_spawn_position.x = closest_vehicle_node.x; vehicle_spawn_position.y = closest_vehicle_node.y; vehicle_spawn_position.z = closest_vehicle_node.z; vehicle_spawn_position.h = closest_vehicle_node_heading;
 	
 	STREAMING::REQUEST_MODEL(truck_model_);
-	while (!STREAMING::HAS_MODEL_LOADED(truck_model_)) WAIT(0);
+	while (!STREAMING::HAS_MODEL_LOADED(truck_model_)) Wait(0);
 	armored_truck_ = VEHICLE::CREATE_VEHICLE(truck_model_, vehicle_spawn_position.x, vehicle_spawn_position.y, vehicle_spawn_position.z, vehicle_spawn_position.h, 0, 0);
 
 	STREAMING::REQUEST_MODEL(skin_);
-	while (!STREAMING::HAS_MODEL_LOADED(skin_)) WAIT(0);
+	while (!STREAMING::HAS_MODEL_LOADED(skin_)) Wait(0);
 	truck_driver_ = PED::CREATE_PED_INSIDE_VEHICLE(armored_truck_, 26, skin_, -1, false, false);
 	if (IsTheUniverseFavorable(0.5)) truck_passenger_ = PED::CREATE_PED_INSIDE_VEHICLE(armored_truck_, 26, skin_, 0, false, false);
 	VEHICLE::SET_VEHICLE_DOORS_LOCKED(armored_truck_, 2);
-	WAIT(0);
+	Wait(0);
 	if (ENTITY::DOES_ENTITY_EXIST(truck_driver_)) AI::TASK_VEHICLE_DRIVE_WANDER(truck_driver_, armored_truck_, 10.0f, 153);
 	truck_blip_ = UI::ADD_BLIP_FOR_ENTITY(armored_truck_);
 	if (use_default_blip) UI::SET_BLIP_SPRITE(truck_blip_, 1);
@@ -701,7 +722,7 @@ MissionType ArmoredTruckMission::Execute() {
 		VEHICLE::SET_VEHICLE_DOOR_CONTROL(armored_truck_, 3, 3, 0.666);
 	}
 	if (PED::IS_PED_IN_VEHICLE(player_ped, armored_truck_, 0)) {
-		WAIT(125);
+		Wait(125);
 		VEHICLE::SET_VEHICLE_DOOR_CONTROL(armored_truck_, 2, 3, 0.666);
 		VEHICLE::SET_VEHICLE_DOOR_CONTROL(armored_truck_, 3, 3, 0.666);
 	}
@@ -761,7 +782,7 @@ MissionType AssassinationMission::Prepare() {
 	Vector4 target_spawn_position = SelectASpawnPoint(player_position, vehicle_spawn_points, reserved_vehicle_spawn_points, spawn_point_maximum_range, spawn_point_minimum_range, NULL);
 	if (target_spawn_position.x == 0.0f && target_spawn_position.y == 0.0f && target_spawn_position.z == 0.0f && target_spawn_position.h == 0.0f) return NO_Mission;
 	assassination_target_ = PED::CREATE_RANDOM_PED(target_spawn_position.x, target_spawn_position.y, target_spawn_position.z);
-	while (!ENTITY::DOES_ENTITY_EXIST(assassination_target_)) WAIT(0);
+	while (!ENTITY::DOES_ENTITY_EXIST(assassination_target_)) Wait(0);
 	PED::SET_PED_DESIRED_HEADING(assassination_target_, target_spawn_position.h);
 	target_blip_ = UI::ADD_BLIP_FOR_ENTITY(assassination_target_);
 	AI::TASK_WANDER_STANDARD(assassination_target_, 1000.0f, 0);
@@ -814,7 +835,7 @@ MissionType DestroyVehicleMission::Prepare() {
 	Hash vehicle_hash = SelectAVehicleModel(possible_vehicle_models, destroyable_vehicle_classes);
 	if (vehicle_hash == NULL) return NO_Mission;
 	STREAMING::REQUEST_MODEL(vehicle_hash);
-	while (!STREAMING::HAS_MODEL_LOADED(vehicle_hash)) WAIT(0);
+	while (!STREAMING::HAS_MODEL_LOADED(vehicle_hash)) Wait(0);
 	vehicle_to_destroy_ = VEHICLE::CREATE_VEHICLE(vehicle_hash, vehicle_spawn_position.x, vehicle_spawn_position.y, vehicle_spawn_position.z, vehicle_spawn_position.h, 0, 0);
 	VEHICLE::SET_VEHICLE_ON_GROUND_PROPERLY(vehicle_to_destroy_);
 	vehicle_blip_ = UI::ADD_BLIP_FOR_ENTITY(vehicle_to_destroy_);
@@ -885,7 +906,7 @@ MissionType StealVehicleMission::Prepare() {
 	if (vehicle_spawn_position.x == 0.0f && vehicle_spawn_position.y == 0.0f && vehicle_spawn_position.z == 0.0f && vehicle_spawn_position.h == 0.0f) return NO_Mission;
 	
 	STREAMING::REQUEST_MODEL(vehicle_hash_); // oh wait no, we can just load it.
-	while (!STREAMING::HAS_MODEL_LOADED(vehicle_hash_)) WAIT(0);
+	while (!STREAMING::HAS_MODEL_LOADED(vehicle_hash_)) Wait(0);
 	vehicle_to_steal_ = VEHICLE::CREATE_VEHICLE(vehicle_hash_, vehicle_spawn_position.x, vehicle_spawn_position.y, vehicle_spawn_position.z, vehicle_spawn_position.h, 0, 0);
 	VEHICLE::SET_VEHICLE_ON_GROUND_PROPERLY(vehicle_to_steal_);
 	//if (IsTheUniverseFavorable(1.0)) VEHICLE::SET_VEHICLE_IS_STOLEN(vehicle_to_steal_, true); // doesn't work.
@@ -901,7 +922,7 @@ MissionType StealVehicleMission::Prepare() {
 	if (IsTheUniverseFavorable(0.1666)) {
 		vehicle_must_be_undamaged_ = true;
 		CreateNotification("A special ~y~vehicle~w~ has been requested for retrieval.", play_notification_beeps);
-		WAIT(1500);
+		Wait(1500);
 		CreateNotification("Additionally, the client requested that it be delivered without damage.", play_notification_beeps);
 	} else {
 		vehicle_must_be_undamaged_ = false;
@@ -961,7 +982,7 @@ MissionType StealVehicleMission::Execute() {
 		float dropOffDistance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(vehicle_coordinates.x, vehicle_coordinates.y, vehicle_coordinates.z, drop_off_coordinates.x, drop_off_coordinates.y, drop_off_coordinates.z, 0);
 		if (dropOffDistance < 0.7f && PED::IS_PED_IN_VEHICLE(player_ped, vehicle_to_steal_, 0)) {
 			VEHICLE::SET_VEHICLE_FORWARD_SPEED(vehicle_to_steal_, 0.0f);
-			while (ENTITY::GET_ENTITY_SPEED(vehicle_to_steal_) != 0) WAIT(0);
+			while (ENTITY::GET_ENTITY_SPEED(vehicle_to_steal_) != 0) Wait(0);
 			AI::TASK_LEAVE_VEHICLE(player_ped, vehicle_to_steal_, 0);
 			VEHICLE::SET_VEHICLE_UNDRIVEABLE(vehicle_to_steal_, 1);
 			int reward_amount_by_class;
@@ -1037,7 +1058,7 @@ Ped BadGuyHandler::CreateABadGuy(Vector4 origin_vector, char * skin, float x_mar
 	Ped skin_hash_key = GAMEPLAY::GET_HASH_KEY(skin);
 	STREAMING::REQUEST_MODEL(skin_hash_key);
 	Ped this_ped = PED::CREATE_PED(26, skin_hash_key, origin_vector.x, origin_vector.y, origin_vector.z, 0, false, true);
-	while (!ENTITY::DOES_ENTITY_EXIST(this_ped)) WAIT(0);
+	while (!ENTITY::DOES_ENTITY_EXIST(this_ped)) Wait(0);
 	PED::SET_PED_RELATIONSHIP_GROUP_HASH(this_ped, GAMEPLAY::GET_HASH_KEY("HATES_PLAYER"));
 	if (weapon != "NONE") {
 		if (weapon == "SURPRISE_ME") {
@@ -1122,9 +1143,10 @@ void MissionHandler::Update() {
 	if (current_mission_type_ == NO_Mission) ticks_since_last_mission_ += (GetTickCount64() - tick_count_at_last_update_);
 	else ticks_since_mission_start_ += (GetTickCount64() - tick_count_at_last_update_);
 	tick_count_at_last_update_ = GetTickCount64();
-
-	if (ticks_since_last_mission_ > ticks_between_missions_) { // Enough time has passed that we can start a new mission.
+	// Enough time has passed that we can start a new mission.
+	if (ticks_since_last_mission_ > ticks_between_missions_) { 
 		current_mission_type_ = MissionType(rand() % MAX_Mission); // I used to think this was silly. Now I think it's awesome.
+		//current_mission_type_ = CrateDrop;
 		//current_mission_type_ = ArmoredTruck;
 		switch (current_mission_type_) {
 		case StealVehicle:	current_mission_type_ = StealVehicleMission.Prepare();		break; // Prepare()s should return their MissionType on success.
@@ -1164,9 +1186,22 @@ void MissionHandler::Update() {
 void InputHandler() {
 	if (IsControlPressed(ControlScriptPadDown) && IsControlJustReleased(ControlScriptRS)) {
 		Logger.Write("InputHandler(): (IsControlPressed(ControlScriptPadDown) && IsControlJustReleased(ControlScriptRS))", LogVerbose);
+		
 		//CreateNotification("saving point to file", play_notification_beeps);
 		//crate_spawn_points.push_back(player_position);
 		//crate_spawn_file << std::setprecision(9) << player_position.x << " , " << player_position.y << " , " << player_position.z << std::endl;
+
+		//CreateNotification("WITH COLLISION", play_notification_beeps);
+		//crate_hash = GAMEPLAY::GET_HASH_KEY("prop_box_ammo04a");
+		//STREAMING::REQUEST_MODEL(GAMEPLAY::GET_HASH_KEY("prop_box_ammo04a"));
+		//while (!STREAMING::HAS_MODEL_LOADED(GAMEPLAY::GET_HASH_KEY("prop_box_ammo04a"))) Wait(0);
+		//Vector3 v3 = GetCoordinateByOriginBearingAndDistance(player_position, 0.01f, 3.0f);
+		//crate = OBJECT::CREATE_AMBIENT_PICKUP(0x14568F28, v3.x, v3.y, v3.z+2, -1, 0, crate_hash, 1, 1);
+		//ENTITY::SET_ENTITY_ALPHA(crate, 255, 1);
+		//STREAMING::REQUEST_COLLISION_FOR_MODEL(crate_hash);
+		//while (!STREAMING::HAS_COLLISION_FOR_MODEL_LOADED(crate_hash)) Wait(0);
+		//ENTITY::SET_ENTITY_COLLISION(crate, true, true); 
+		//crate_blip = UI::ADD_BLIP_FOR_ENTITY(crate);
 
 		//float ground_z = GetGroundZAtThisLocation(player_position);
 		//float my_calculated_height_above_ground = player_position.z - ground_z;
@@ -1181,6 +1216,25 @@ void InputHandler() {
 		//Logger.Write(ss3.str(), LogNormal);
 		
 	}
+	if (IsControlPressed(ControlScriptPadDown) && IsControlJustReleased(ControlScriptRB)) {
+
+		//CreateNotification("WITHOUT COLLISION", play_notification_beeps);
+		//crate_hash = GAMEPLAY::GET_HASH_KEY("prop_box_ammo04a");
+		//STREAMING::REQUEST_MODEL(GAMEPLAY::GET_HASH_KEY("prop_box_ammo04a"));
+		//while (!STREAMING::HAS_MODEL_LOADED(GAMEPLAY::GET_HASH_KEY("prop_box_ammo04a"))) Wait(0);
+		//Vector3 v3 = GetCoordinateByOriginBearingAndDistance(player_position, 180.01f, 3.0f);
+		//crate = OBJECT::CREATE_AMBIENT_PICKUP(0x14568F28, v3.x, v3.y, v3.z+2, -1, 0, crate_hash, 1, 1);
+		//ENTITY::SET_ENTITY_ALPHA(crate, 255, 1);
+		//crate_blip = UI::ADD_BLIP_FOR_ENTITY(crate);
+
+
+		/*STREAMING::REQUEST_COLLISION_FOR_MODEL(crate_hash);
+		while (!STREAMING::HAS_COLLISION_FOR_MODEL_LOADED(crate_hash)) Wait(0);
+		ENTITY::SET_ENTITY_COLLISION(crate, true, true);*/
+	}
+
+
+
 	if (IsKeyDown(VK_OEM_4) && IsKeyJustUp(VK_OEM_6)) { // open then close
 		CreateNotification("Displaying blips for crates", play_notification_beeps);
 		for (Vector4 vec : crate_spawn_points) {
@@ -1227,18 +1281,18 @@ void Update() {
 void WaitDuringDeathArrestOrLoading(uint milliseconds) {
 	if (ENTITY::IS_ENTITY_DEAD(PLAYER::PLAYER_PED_ID())) {
 		Logger.Write("WaitDuringDeathArrestOrLoading(): Player is Wasted, waiting for player...", LogNormal);
-		while (ENTITY::IS_ENTITY_DEAD(PLAYER::PLAYER_PED_ID())) WAIT(milliseconds);
+		while (ENTITY::IS_ENTITY_DEAD(PLAYER::PLAYER_PED_ID())) Wait(milliseconds);
 		Logger.Write("WaitDuringDeathArrestOrLoading(): Returning to game.", LogNormal);
 	}
 	if (PLAYER::IS_PLAYER_BEING_ARRESTED(PLAYER::PLAYER_ID(), TRUE)) {
 		Logger.Write("WaitDuringDeathArrestOrLoading(): Player is Busted, waiting for player...", LogNormal);
-		while (PLAYER::IS_PLAYER_BEING_ARRESTED(PLAYER::PLAYER_ID(), TRUE)) WAIT(milliseconds);
+		while (PLAYER::IS_PLAYER_BEING_ARRESTED(PLAYER::PLAYER_ID(), TRUE)) Wait(milliseconds);
 		Logger.Write("WaitDuringDeathArrestOrLoading(): Returning to game.", LogNormal);
 
 	}
 	if (DLC2::GET_IS_LOADING_SCREEN_ACTIVE()) {
 		Logger.Write("WaitDuringDeathArrestOrLoading(): Loading screen is active, waiting for game...", LogNormal);
-		while (DLC2::GET_IS_LOADING_SCREEN_ACTIVE()) WAIT(milliseconds);
+		while (DLC2::GET_IS_LOADING_SCREEN_ACTIVE()) Wait(milliseconds);
 		Logger.Write("WaitDuringDeathArrestOrLoading(): Returning to game.", LogNormal);
 	}
 	return;
@@ -1247,7 +1301,7 @@ void WaitDuringDeathArrestOrLoading(uint milliseconds) {
 void UglyHackForVehiclePersistenceScripts(uint seconds) {
 	Logger.Write("UglyHackForVehiclePersistenceScripts()", LogNormal);
 	if ((seconds == 0)) return; // no point in wasting time or spawns if the user doesn't use a persistence script.
-	WAIT(DWORD(seconds * 1000)); // let the persistence script start up and spawn its own vehicles.
+	Wait(DWORD(seconds * 1000)); // let the persistence script start up and spawn its own vehicles.
 	reserved_vehicle_spawn_points = GetParkedVehiclesFromWorld(player_ped, reserved_vehicle_spawn_points, maximum_number_of_spawn_points, vehicle_search_range_minimum); // set aside these spawns. Note that some legitimate spawns will invariably get reserved. This is why it's an ugly hack.
 	Logger.Write("reserved_vehicle_spawn_points_parked.size(): " + std::to_string(reserved_vehicle_spawn_points.size()), LogNormal);
 	return;
@@ -1379,6 +1433,7 @@ void PopulateCrateSpawnPoints() {
 	v.x = -457.259155; v.y = -2015.05298; v.z = 16.9318581; crate_spawn_points.push_back(v);
 	v.x = -401.050323; v.y = -1987.33069; v.z = 29.9463425; crate_spawn_points.push_back(v);
 	v.x = -566.903625; v.y = -1780.06775; v.z = 23.4318352; crate_spawn_points.push_back(v);
+	//v.x = 1120.81238; v.y = -2167.49976; v.z = 31.8482285; crate_spawn_points.push_back(v);
 }
 
 void GetSettingsFromIniFile() {
@@ -1409,6 +1464,7 @@ void GetSettingsFromIniFile() {
 
 void Init() {
 	Logger.Write("init()", LogNormal);
+	srand(GetTickCount64());
 	GetSettingsFromIniFile();
 	Logger.SetLoggingLevel(logging_level);
 	WaitDuringDeathArrestOrLoading(3333);
@@ -1430,18 +1486,45 @@ void Init() {
 
 void ScriptMain() {
 	Logger.Write("ScriptMain()", LogNormal);
-	
-	srand(GetTickCount64());
-	
+
+	if (FileExists("OnlineEventsReduxRedux.asi")) {
+		Logger.Write("OnlineEventsReduxRedux.asi - FILE EXISTS, MOVING TO PASSIVE LOOP", LogError);
+		WaitDuringDeathArrestOrLoading(3333);
+		ULONGLONG tick_start = GetTickCount64();
+		ULONGLONG ticks_to_wait = 10000;
+		CreateNotification("~b~Online Events Redux!~w~ (v1.1.2)", play_notification_beeps);
+		while (true) {
+			ULONGLONG current_tick = GetTickCount64();
+			if (current_tick - tick_start > ticks_to_wait) {
+				CreateNotification("~r~WARNING:~n~~w~A new ~y~conflicting~w~ version of~n~Online Events has been released, and you are", false);
+				CreateNotification("still running the old version!", false);
+				CreateNotification("~r~PLEASE REMOVE:~n~~b~OnlineEventsRedux~y~Redux~b~.asi~w~~n~and restart your game!", false);
+				tick_start = GetTickCount64();
+				ticks_to_wait += 90000;
+			}
+			Wait(0);
+		}
+	}
+
 	Init();
-	if ( !load_without_notification ) CreateNotification("~r~Online Events Redux!~w~ (v1.1)", play_notification_beeps);
+	if ( !load_without_notification ) CreateNotification("~b~Online Events Redux!~w~ (v1.1.2)", play_notification_beeps);
 	MissionHandler MissionHandler;
 
+	std::vector<double> durations;
+
 	while (true) {
+		Wait(0);
+		std::chrono::high_resolution_clock::time_point loop_start = std::chrono::high_resolution_clock::now();
 		WaitDuringDeathArrestOrLoading(0);
 		Update();
 		MissionHandler.Update();
-		WAIT(0);
+		if (durations.size() == 2048) {
+			double average = std::accumulate(durations.begin(), durations.end(), 0.0) / durations.size();
+			Logger.Write("ScriptMain(): profiler_duration (last " + std::to_string(durations.size()) + "):  " + std::to_string(average) + "  times_waited: " + std::to_string(times_waited), LogDebug);
+			times_waited = 0;
+			durations.clear();
+		}
+		durations.push_back((std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - loop_start)).count() * 1000);
 	}
 
 	Logger.Close(); // I don't think this will ever happen...
