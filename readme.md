@@ -251,6 +251,18 @@ FAQ
 CHANGELOG 
 --------------------
 
+ 1.1	- Armored Truck mission: Killing the driver no longer unlocks the door, but you can force the doors open by damaging the truck enough. This is not perfect, but it's a WIP. The doors should still unlock if the driver flees the vehicle. The doors should open and release the cash more reliably. The truck itself spawns on the closest vehicle node to the chosen spawn, so it shouldn't get stuck as often.
+
+		- Crate Drop mission: Guards respawn! Unfortunately they don't always spawn behind you, so it can be a bit immersion breaking. Still, even the default setting of 4 guards is challenging: that's four enemies AT A TIME. Also, I added over a hundred hand-picked spawn points for the crate. Some of them cause it to spawn inside things, which is its own problem. I'll try to fix that later. At least it's not the same ten any more. Oh, also the guards should wander around, at least until you start shooting. Oh, also the guards spawn more randomly, and *should* always get set on the ground, but I make no promises. You may sometimes see them fall out of the sky. You've been warned.
+
+		- The algorithm that finds spawn points was collecting points that were basically the same as existing ones, but off by ~0.0001 meters. Now the function only adds points that are at least 1 meter from all the other points. Unfortunately, this added a lot of overhead, and in some cases can actually slow the game down (I'm talking 16+ ms to complete, which cuts the framerate in half...). I've added some self-profiling code to prevent this. 
+		
+		- Added load_without_notification flag to prevent the popup and beep when the mod starts.
+
+		- Changed some default settings in the ini file, and edited some descriptions.
+
+		- Logging at the most verbose level shouldn't fill up your disk anymore. It also now pad columns a bit more effectively.
+ 
  1.0	- Umm...
 
 <a name="CREDITS"></a>
