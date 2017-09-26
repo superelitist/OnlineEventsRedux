@@ -95,7 +95,6 @@ double Radians(double degrees) {
 }
 
 Vector4 GetVector4OfEntity(Entity entity) {
-	Logger.Write("GetVector4OfEntity():", LogLudicrous);
 	return Vector4 { ENTITY::GET_ENTITY_COORDS(entity, 0), ENTITY::_GET_ENTITY_PHYSICS_HEADING(entity) };
 }
 
@@ -167,11 +166,10 @@ void ChangeMoneyForCurrentPlayer(int value, float modifier) {
 	STATS::STAT_GET_INT(hash, &player_cash, -1);
 	player_cash += value;
 	STATS::STAT_SET_INT(hash, player_cash, 1);
-	Logger.Write("ChangeMoneyForCurrentPlayer(): added " + std::to_string(value) + " dollars.", LogNormal);
+	Logger.Write("ChangeMoneyForCurrentPlayer(): added " + std::to_string(value) + " dollars.", LogVerbose);
 }
 
 Hash GetHashOfVehicleModel(Vehicle vehicle) {
-	Logger.Write("GetHashOfVehicleModel():", LogLudicrous);
 	return ENTITY::GET_ENTITY_MODEL(vehicle);
 }
 
@@ -215,7 +213,6 @@ void SetPlayerMinimumWantedLevel(WantedLevel wanted_level) {
 }
 
 bool IsVehicleProbablyParked(Vehicle vehicle) {
-	Logger.Write("IsVehicleProbablyParked()", LogLudicrous);
 	if ((VEHICLE::IS_VEHICLE_STOPPED(vehicle)) &&
 		(VEHICLE::GET_PED_IN_VEHICLE_SEAT(vehicle, -1) == 0) && // IS_VEHICLE_SEAT_FREE doesn't fucking work.
 		(VEHICLE::GET_VEHICLE_NUMBER_OF_PASSENGERS(vehicle) == 0)) {
@@ -225,7 +222,6 @@ bool IsVehicleProbablyParked(Vehicle vehicle) {
 }
 
 bool IsVehicleDrivable(Vehicle vehicle) {
-	Logger.Write("IsVehicleDrivable()", LogLudicrous);
 	Hash hash_of_vehicle_model = GetHashOfVehicleModel(vehicle);
 	if (VEHICLE::IS_VEHICLE_DRIVEABLE(vehicle, false) &&
 		(VEHICLE::IS_THIS_MODEL_A_CAR(hash_of_vehicle_model) ||
@@ -237,12 +233,10 @@ bool IsVehicleDrivable(Vehicle vehicle) {
 }
 
 bool DoesEntityExistAndIsNotNull(Entity entity) {
-	Logger.Write("DoesEntityExistAndIsNotNull()", LogLudicrous);
 	return (entity != NULL && ENTITY::DOES_ENTITY_EXIST(entity));
 }
 
 std::vector<Hash> GetVehicleModelsFromWorld(Ped ped, std::vector<Hash> vector_of_hashes, int maximum_vector_size) {
-	Logger.Write("GetVehicleModelsFromWorld()", LogLudicrous);
 	const int ARR_SIZE = 1024;
 	Vehicle all_world_vehicles[ARR_SIZE];
 	int count = worldGetAllVehicles(all_world_vehicles, ARR_SIZE);
@@ -271,7 +265,6 @@ std::vector<Hash> GetVehicleModelsFromWorld(Ped ped, std::vector<Hash> vector_of
 }
 
 std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vector4> vector_of_vector4s, int maximum_vector_size, int search_range_minimum) {
-	Logger.Write("GetParkedCarsFromWorld()", LogLudicrous);
 	std::chrono::high_resolution_clock::time_point time_point_at_search_start = std::chrono::high_resolution_clock::now();
 	std::chrono::high_resolution_clock::time_point time_point_at_this_loop_instance = time_point_at_search_start;
 	uint times_waited = 0;
@@ -335,7 +328,7 @@ std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vector4> ve
 }
 
 Vector4 SelectASpawnPoint(Vector4 origin, std::vector<Vector4> vector4s_to_search, std::vector<Vector4> vector4s_to_exclude, uint max_range, uint min_range, Hash vehicle_hash) {
-	Logger.Write("SelectASpawnPoint()", LogLudicrous);
+	Logger.Write("SelectASpawnPoint()", LogVerbose);
 	Vector4 empty_spawn_point;
 	std::vector<Vector4> filtered_vector4s;
 	if (vector4s_to_search.size() == 0) { // don't bother continuing with an empty vector.
@@ -367,7 +360,7 @@ Vector4 SelectASpawnPoint(Vector4 origin, std::vector<Vector4> vector4s_to_searc
 }
 
 Hash SelectAVehicleModel(std::vector<Hash> vector_of_hashes_to_search, uint vehicle_class_options) {
-	Logger.Write("SelectAVehicleModel()", LogLudicrous);
+	Logger.Write("SelectAVehicleModel()", LogVerbose);
 	Hash empty_hash = NULL;
 	std::vector<Hash> filtered_hashes;
 	if (vector_of_hashes_to_search.size() == 0) {
@@ -390,7 +383,7 @@ Hash SelectAVehicleModel(std::vector<Hash> vector_of_hashes_to_search, uint vehi
 }
 
 Ped SpawnACrateGuard(Ped skin, Vector4 crate_spawn_point, float x_margin, float y_margin, float z_margin, char * weapon) {
-	Logger.Write("SpawnACrateGuard()", LogLudicrous);
+	Logger.Write("SpawnACrateGuard()", LogVerbose);
 	Vector4 spawn_point = crate_spawn_point;
 	spawn_point.x += GetFromUniformRealDistribution(-x_margin, x_margin); spawn_point.y += GetFromUniformRealDistribution(-y_margin, y_margin); spawn_point.z += GetFromUniformRealDistribution(-z_margin, z_margin);
 	
@@ -489,7 +482,6 @@ MissionType CrateDropMission::Prepare() {
 }
 
 MissionType CrateDropMission::Execute() {
-	Logger.Write("CrateDropMission::Execute()", LogLudicrous);
 	int distance_to_crate = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_position.x, player_position.y, player_position.z, crate_spawn_location_.x, crate_spawn_location_.y, crate_spawn_location_.z, 0);
 	if (distance_to_crate < 300 && !objects_were_spawned_) {
 		Logger.Write("CrateDropMission::Execute(): Creating objects...", LogVerbose);
@@ -570,7 +562,7 @@ MissionType CrateDropMission::Execute() {
 }
 
 MissionType CrateDropMission::Timeout() {
-	Logger.Write("CrateDropMission::Timeout()", LogLudicrous);
+	Logger.Write("CrateDropMission::Timeout()", LogVerbose);
 	uint distance_to_crate = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_position.x, player_position.y, player_position.z, crate_spawn_location_.x, crate_spawn_location_.y, crate_spawn_location_.z, 0);
 	if (distance_to_crate > mission_minimum_range_for_timeout || ENTITY::IS_ENTITY_DEAD(player_ped)) {
 		UI::REMOVE_BLIP(&crate_blip_);
@@ -652,7 +644,6 @@ MissionType ArmoredTruckMission::Prepare() {
 }
 
 MissionType ArmoredTruckMission::Execute() {
-	Logger.Write("ArmoredTruckMission::Execute()", LogLudicrous);
 	Vector4 truck_position = GetVector4OfEntity(armored_truck_);
 	uint distance_to_truck = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(truck_position.x, truck_position.y, truck_position.z, player_position.x, player_position.y, player_position.z, 0);
 	
@@ -739,7 +730,7 @@ MissionType ArmoredTruckMission::Execute() {
 }
 
 MissionType ArmoredTruckMission::Timeout() {
-	Logger.Write("ArmoredTruckMission::Timeout()", LogLudicrous);
+	Logger.Write("ArmoredTruckMission::Timeout()", LogVerbose);
 	Vector3 truck_coordinates = ENTITY::GET_ENTITY_COORDS(armored_truck_, 0);
 	uint distance_to_truck = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(truck_coordinates.x, truck_coordinates.y, truck_coordinates.z, player_position.x, player_position.y, player_position.z, 0);
 	if (distance_to_truck > mission_minimum_range_for_timeout || ENTITY::IS_ENTITY_DEAD(player_ped)) {
@@ -780,7 +771,6 @@ MissionType AssassinationMission::Prepare() {
 }
 
 MissionType AssassinationMission::Execute() {
-	Logger.Write("AssassinationMission::Execute()", LogLudicrous);
 	if (ENTITY::IS_ENTITY_DEAD(assassination_target_)) {
 		UI::REMOVE_BLIP(&target_blip_);
 		ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&assassination_target_);
@@ -792,7 +782,7 @@ MissionType AssassinationMission::Execute() {
 }
 
 MissionType AssassinationMission::Timeout() {
-	Logger.Write("AssassinationMission::Timeout()", LogLudicrous);
+	Logger.Write("AssassinationMission::Timeout()", LogVerbose);
 	Vector3 target_coordinates = ENTITY::GET_ENTITY_COORDS(assassination_target_, 0);
 	uint distance_to_target = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(target_coordinates.x, target_coordinates.y, target_coordinates.z, player_position.x, player_position.y, player_position.z, 0);
 	if (distance_to_target > mission_minimum_range_for_timeout || ENTITY::IS_ENTITY_DEAD(player_ped)) {
@@ -835,7 +825,6 @@ MissionType DestroyVehicleMission::Prepare() {
 }
 
 MissionType DestroyVehicleMission::Execute() {
-	Logger.Write("DestroyVehicleMission::Execute()", LogLudicrous);
 	if (!VEHICLE::IS_VEHICLE_DRIVEABLE(vehicle_to_destroy_, 1)) {
 		UI::REMOVE_BLIP(&vehicle_blip_);
 		ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&vehicle_to_destroy_);
@@ -847,7 +836,7 @@ MissionType DestroyVehicleMission::Execute() {
 }
 
 MissionType DestroyVehicleMission::Timeout() {
-	Logger.Write("DestroyVehicleMission::Timeout()", LogLudicrous);
+	Logger.Write("DestroyVehicleMission::Timeout()", LogVerbose);
 	Vector3 vehicle_coordinates = ENTITY::GET_ENTITY_COORDS(vehicle_to_destroy_, 0);
 	uint vehicleDistance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(vehicle_coordinates.x, vehicle_coordinates.y, vehicle_coordinates.z, player_position.x, player_position.y, player_position.z, 0);
 	if (vehicleDistance > mission_minimum_range_for_timeout || ENTITY::IS_ENTITY_DEAD(player_ped)) {
@@ -920,7 +909,6 @@ MissionType StealVehicleMission::Prepare() {
 }
 
 MissionType StealVehicleMission::Execute() {
-	Logger.Write("StealVehicleMission::Execute()", LogLudicrous);
 	if (!VEHICLE::IS_VEHICLE_DRIVEABLE(vehicle_to_steal_, 1)) {
 		CreateNotification("The ~y~vehicle~w~ has been destroyed.", play_notification_beeps);
 		if (mission_objective_ == DeliverCar) UI::REMOVE_BLIP(&drop_off_blip_);
@@ -1012,7 +1000,7 @@ MissionType StealVehicleMission::Execute() {
 }
 
 MissionType StealVehicleMission::Timeout() {
-	Logger.Write("StealVehicleMission::Timeout()", LogLudicrous);
+	Logger.Write("StealVehicleMission::Timeout()", LogVerbose);
 	Vector3 vehicle_coordinates = ENTITY::GET_ENTITY_COORDS(vehicle_to_steal_, 0);
 	uint vehicleDistance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(vehicle_coordinates.x, vehicle_coordinates.y, vehicle_coordinates.z, player_position.x, player_position.y, player_position.z, 0);
 	if (vehicleDistance > mission_minimum_range_for_timeout || ENTITY::IS_ENTITY_DEAD(player_ped)) {
@@ -1040,7 +1028,7 @@ private:
 
 Ped BadGuyHandler::CreateABadGuy(Vector4 origin_vector, char * skin, float x_margin, float y_margin, float z_margin, char * weapon)
 {
-	Logger.Write("CreateABadGuy()", LogLudicrous);
+	Logger.Write("CreateABadGuy()", LogDebug);
 	Vector4 spawn_point = origin_vector;
 	origin_vector.x += GetFromUniformRealDistribution(-x_margin, x_margin); origin_vector.y += GetFromUniformRealDistribution(-y_margin, y_margin); origin_vector.z += GetFromUniformRealDistribution(-z_margin, z_margin);
 	Ped skin_hash_key = GAMEPLAY::GET_HASH_KEY(skin);
@@ -1090,7 +1078,7 @@ bool BadGuyHandler::RemoveABadGuy(Ped bad_guy)
 
 std::set<Ped> BadGuyHandler::CreateABadGuySquad(Vector4 origin_vector, char * skin, float x_margin, float y_margin, float z_margin, char * weapon, uint quantity_of_bad_guys) {
 	std::set<Ped> this_squad;
-	Logger.Write("CreateABadGuySquad()", LogLudicrous);
+	Logger.Write("CreateABadGuySquad()", LogDebug);
 	for (uint i = 0; i < quantity_of_bad_guys; i++) {
 		this_squad.insert(CreateABadGuy(origin_vector, skin, (x_margin + quantity_of_bad_guys), (y_margin + quantity_of_bad_guys), (z_margin + quantity_of_bad_guys), weapon));
 	}
@@ -1128,8 +1116,6 @@ private:
 };
 
 void MissionHandler::Update() {
-	Logger.Write("MissionHandler::Update()", LogLudicrous);
-
 	if (current_mission_type_ == NO_Mission) ticks_since_last_mission_ += (GetTickCount64() - tick_count_at_last_update_);
 	else ticks_since_mission_start_ += (GetTickCount64() - tick_count_at_last_update_);
 	tick_count_at_last_update_ = GetTickCount64();
@@ -1174,7 +1160,7 @@ void MissionHandler::Update() {
 
 void InputHandler() {
 	if (IsControlPressed(ControlScriptPadDown) && IsControlJustReleased(ControlScriptRS)) {
-
+		Logger.Write("InputHandler(): (IsControlPressed(ControlScriptPadDown) && IsControlJustReleased(ControlScriptRS))", LogVerbose);
 		//CreateNotification("saving point to file", play_notification_beeps);
 		//crate_spawn_points.push_back(player_position);
 		//crate_spawn_file << std::setprecision(9) << player_position.x << " , " << player_position.y << " , " << player_position.z << std::endl;
@@ -1210,7 +1196,6 @@ void InputHandler() {
 }
 
 void Update() {
-	Logger.Write("Update()", LogLudicrous);
 	player_ped = PLAYER::PLAYER_PED_ID();
 	player = PLAYER::PLAYER_ID(); // need to be updated every cycle?
 	player_position = Vector4(ENTITY::GET_ENTITY_COORDS(player_ped, 0), ENTITY::GET_ENTITY_HEADING(player_ped));
@@ -1237,7 +1222,6 @@ void Update() {
 }
 
 void WaitDuringDeathArrestOrLoading(uint milliseconds) {
-	Logger.Write("WaitDuringDeathArrestOrLoading()", LogLudicrous);
 	if (ENTITY::IS_ENTITY_DEAD(PLAYER::PLAYER_PED_ID())) {
 		Logger.Write("WaitDuringDeathArrestOrLoading(): Player is Wasted, waiting for player...", LogNormal);
 		while (ENTITY::IS_ENTITY_DEAD(PLAYER::PLAYER_PED_ID())) WAIT(milliseconds);
@@ -1267,6 +1251,7 @@ void UglyHackForVehiclePersistenceScripts(uint seconds) {
 }
 
 void PopulateCrateSpawnPoints() {
+	Logger.Write("PopulateCrateSpawnPoints()", LogNormal);
 	Vector4 v;
 	v.x = -1782.33f; v.y = -826.29f; v.z = 7.83f; crate_spawn_points.push_back(v);
 	v.x = 1067.85; v.y = 2362.45; v.z = 43.87; crate_spawn_points.push_back(v);
