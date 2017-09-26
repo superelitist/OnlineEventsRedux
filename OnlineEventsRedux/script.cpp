@@ -45,7 +45,7 @@ std::vector<Hash> possible_vehicle_models;
 std::set<Blip> crate_spawn_blips;
 
 // preference options
-bool play_notification_beeps, use_default_blip;
+bool load_without_notification, play_notification_beeps, use_default_blip;
 uint mission_cooldown, mission_timeout;
 uint spawn_point_minimum_range, spawn_point_maximum_range;
 uint mission_minimum_range_for_timeout;
@@ -1384,6 +1384,7 @@ void PopulateCrateSpawnPoints() {
 void GetSettingsFromIniFile() {
 	Logger.Write("GetSettingsFromIniFile()", LogNormal);
 	// OPTIONS
+	load_without_notification = Reader.ReadBoolean( "Options", "load_without_notification", false );
 	play_notification_beeps = Reader.ReadBoolean("Options", "play_notification_beeps", true);
 	use_default_blip = Reader.ReadBoolean("Options", "use_default_blip", false);
 	mission_timeout = std::max(Reader.ReadInteger("Options", "mission_timeout", 360), 180);
@@ -1406,7 +1407,7 @@ void GetSettingsFromIniFile() {
 	return;
 }
 
-void init() {
+void Init() {
 	Logger.Write("init()", LogNormal);
 	GetSettingsFromIniFile();
 	Logger.SetLoggingLevel(logging_level);
@@ -1432,9 +1433,8 @@ void ScriptMain() {
 	
 	srand(GetTickCount64());
 	
-	init();
-	
-	CreateNotification("~r~Online Events Redux!~w~ (v1.0)", play_notification_beeps);
+	Init();
+	if ( !load_without_notification ) CreateNotification("~r~Online Events Redux!~w~ (v1.1)", play_notification_beeps);
 	MissionHandler MissionHandler;
 
 	while (true) {
