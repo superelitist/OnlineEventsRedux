@@ -69,19 +69,18 @@ bool IsControlJustReleased(eControl control) {
 }
 
 void NotifyBottomCenter(char* message) {
-	Logger.Write("NotifyBottomCenter()", LogLudicrous);
+	
 	UI::BEGIN_TEXT_COMMAND_PRINT("STRING");
 	UI::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME(message);
 	UI::END_TEXT_COMMAND_PRINT(2000, 1);
+	Logger.Write("NotifyBottomCenter(): " + std::string(message), LogVerbose);
 }
 
 void PlayNotificationBeep() {
-	Logger.Write("PlayNotificationBeep()", LogLudicrous);
 	if (play_notification_beeps) AUDIO::PLAY_SOUND_FRONTEND(-1, "Text_Arrive_Tone", "Phone_SoundSet_Default", 0);
 }
 
 void CreateNotification(char* message, bool is_beep_enabled) {
-	Logger.Write("CreateNotification()", LogLudicrous);
 	UI::_SET_NOTIFICATION_TEXT_ENTRY("STRING");
 	UI::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME(message);
 	UI::_DRAW_NOTIFICATION(0, 1);
@@ -90,7 +89,6 @@ void CreateNotification(char* message, bool is_beep_enabled) {
 }
 
 double Radians(double degrees) {
-	Logger.Write("Radians():", LogLudicrous);
 	return degrees * (M_PI / 180);
 }
 
@@ -99,26 +97,29 @@ Vector4 GetVector4OfEntity(Entity entity) {
 }
 
 Vector3 GetCoordinateByOriginBearingAndDistance(Vector4 v4, float bearing, float distance) {
-	Logger.Write("GetCoordinatesByOriginBearingAndDistance():", LogLudicrous);
 	Vector3 v3;	v3.x = v4.x + cos((bearing)*radian) * distance; v3.y = v4.y + sin((bearing)*radian) * distance; v3.z = v4.z;
-	return Vector3{ static_cast<float>(v4.x + cos((bearing)*radian) * distance), 0 , static_cast<float>(v4.y + sin((bearing)*radian) * distance), 0, static_cast<float>(v4.z), 0 };
+	Vector3 result = Vector3{ static_cast<float>(v4.x + cos((bearing)*radian) * distance), 0 , static_cast<float>(v4.y + sin((bearing)*radian) * distance), 0, static_cast<float>(v4.z), 0 };
+	Logger.Write("GetCoordinatesByOriginBearingAndDistance( (" + std::to_string(v4.x) + ", " + std::to_string(v4.y) + ", " + std::to_string(v4.z) + "), " + std::to_string(bearing) + std::to_string(distance) 
+																				+ " ): (" + std::to_string(result.x) + ", " + std::to_string(result.y) + ", " + std::to_string(result.z) + " )", LogVerbose);
+	return result;
 }
 
 double GetAngleBetween2DCoords(float ax, float ay, float bx, float by) {
-	Logger.Write("GetAngleBetween2DCoords():", LogLudicrous);
 	float x_diff = bx - ax;
 	float y_diff = by - ay;
 	double theta = atan2(y_diff, x_diff);
-	return theta / radian;
+	double result = theta / radian;
+	Logger.Write("GetAngleBetween2DCoords( " + std::to_string(ax) + ", " + std::to_string(ay) + ", " + std::to_string(bx) + ", " + std::to_string(by) + " ): " + std::to_string(result), LogVerbose);
+	return result;
 }
 
 double GetDistanceBetween2DCoords(float ax, float ay, float bx, float by) {
-	Logger.Write("GetDistanceBetween2DCoords():", LogLudicrous);
-	return std::hypot(bx - ax, by - ay);
+	double result = std::hypot(bx - ax, by - ay);
+	Logger.Write("GetDistanceBetween2DCoords( " + std::to_string(ax) + ", " + std::to_string(ay) + ", " + std::to_string(bx) + ", " + std::to_string(by) + " ): " + std::to_string(result), LogVerbose);
+	return result;
 }
 
 float GetGroundZAtThisLocation(Vector4 v4) {
-	Logger.Write("GetGroundZAtThisLocation(" + std::to_string(v4.x) + ", " + std::to_string(v4.y) + ", " + std::to_string(v4.z) + ")", LogLudicrous);
 	if (v4.z > 1000.0f) {
 		Logger.Write("GetGroundZAtThisLocation(): v4.z is already over 1000, something went wrong!", LogError);
 		return 9999;
@@ -136,24 +137,27 @@ float GetGroundZAtThisLocation(Vector4 v4) {
 }
 
 double GetFromUniformRealDistribution(double first, double second) {
-	Logger.Write("GetFromUniformRealDistribution():", LogLudicrous);
+	
 	std::uniform_real_distribution<> uniform_real_distribution(first, second);
-	return uniform_real_distribution(generator);
+	double result =  uniform_real_distribution(generator);
+	Logger.Write("GetFromUniformRealDistribution( " + std::to_string(first) + ", " + std::to_string(second) + " ): " + std::to_string(result), LogVerbose);
+	return result;
 }
 
 int GetFromUniformIntDistribution(int first, int second) {
-	Logger.Write("GetFromUniformIntDistribution():", LogLudicrous);
 	std::uniform_int_distribution<> uniform_int_distribution(first, second);
-	return uniform_int_distribution(generator);
+	int result = uniform_int_distribution(generator);
+	Logger.Write("GetFromUniformIntDistribution( " + std::to_string(first) + ", " + std::to_string(second) + " ): " + std::to_string(result), LogVerbose);
+	return result;
 }
 
 bool IsTheUniverseFavorable(float probability) {
-	Logger.Write("IsTheUniverseFavorable():", LogLudicrous);
-	return (GetFromUniformRealDistribution(0, 1) <= probability);
+	bool result = (GetFromUniformRealDistribution(0, 1) <= probability);
+	Logger.Write("IsTheUniverseFavorable(" + std::to_string(probability) + "): " + (result ? "Yes" : "No"), LogVerbose);
+	return result;
 }
 
 void ChangeMoneyForCurrentPlayer(int value, float modifier) {
-	Logger.Write("ChangeMoneyForCurrentPlayer():", LogLudicrous);
 	value = int(value * modifier);
 	int current_player = 99; // Code analysis claims this should be initialized. Obviously, I know that playerPed MUST resolve to 0, 1, or 2, but for the sake of technicality, I'm initializing it here. Of course, if any of those ifs ever DON'T resolve to 0, 1, or 2, I'm gonna crash anyway...
 	int player_cash;
@@ -328,7 +332,6 @@ std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vector4> ve
 }
 
 Vector4 SelectASpawnPoint(Vector4 origin, std::vector<Vector4> vector4s_to_search, std::vector<Vector4> vector4s_to_exclude, uint max_range, uint min_range, Hash vehicle_hash) {
-	Logger.Write("SelectASpawnPoint()", LogVerbose);
 	Vector4 empty_spawn_point;
 	std::vector<Vector4> filtered_vector4s;
 	if (vector4s_to_search.size() == 0) { // don't bother continuing with an empty vector.
@@ -1121,8 +1124,8 @@ void MissionHandler::Update() {
 	tick_count_at_last_update_ = GetTickCount64();
 
 	if (ticks_since_last_mission_ > ticks_between_missions_) { // Enough time has passed that we can start a new mission.
-		//current_mission_type_ = MissionType(rand() % MAX_Mission); // I used to think this was silly. Now I think it's awesome.
-		current_mission_type_ = ArmoredTruck;
+		current_mission_type_ = MissionType(rand() % MAX_Mission); // I used to think this was silly. Now I think it's awesome.
+		//current_mission_type_ = ArmoredTruck;
 		switch (current_mission_type_) {
 		case StealVehicle:	current_mission_type_ = StealVehicleMission.Prepare();		break; // Prepare()s should return their MissionType on success.
 		case DestroyVehicle:	current_mission_type_ = DestroyVehicleMission.Prepare();	break; // If something goes wrong (StealVehicleMission takes too
