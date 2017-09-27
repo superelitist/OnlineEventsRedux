@@ -316,7 +316,7 @@ inline std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vect
 				Vehicle this_vehicle = all_world_vehicles[i];
 				Vector4 this_vehicle_position = { GetVector4OfEntity(this_vehicle) };
 				if (DoesEntityExistAndIsNotNull(this_vehicle) &&
-					GetDistanceBetween3DCoords( player_position, this_vehicle_position ) > search_range_minimum &&
+					!GetIsDistanceBetween3DCoordsLessThan( player_position, this_vehicle_position, search_range_minimum) &&
 					IsVehicleDrivable(this_vehicle) && // is the vehicle a car/bike/etc and can the player start driving it?
 					IsVehicleProbablyParked(this_vehicle) && // not moving, no driver?
 					!(VEHICLE::GET_LAST_PED_IN_VEHICLE_SEAT(this_vehicle, -1) == player_ped) && // probably not previously used by the player? We can hope?
@@ -333,7 +333,7 @@ inline std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vect
 						Wait(0); // The ifs should be fast, but comparing ~150 vehicles in the game world to upwards of 4000 spawn points actually takes appreciable time. Wait(0) hands control back to the game engine for a tick, making sure we don't slow the game down.
 					}
 					auto predicate = [this_vehicle_position](const Vector4 & item) { // didn't want to define a lambda inline, it gets ugly fast.
-						bool too_close_to_another_point = (GetDistanceBetween3DCoords(this_vehicle_position, item) < 1.0);
+						bool too_close_to_another_point = ( GetIsDistanceBetween3DCoordsLessThan( this_vehicle_position, item, 1.0 ) );
 						return (too_close_to_another_point);
 					};
 					bool found_in_vector = (std::find_if(vector_of_vector4s.begin(), vector_of_vector4s.end(), predicate) != vector_of_vector4s.end()); // make sure this_vehicle_position does not already exist in vector_of_vector4s
