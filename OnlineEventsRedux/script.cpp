@@ -325,7 +325,7 @@ inline std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vect
 					}
 
 					auto predicate = [this_vehicle_position](const Vector4 & item) { // didn't want to define a lambda inline, it gets ugly fast.
-						bool too_close_to_another_point = (GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(item.x, item.y, item.z, this_vehicle_position.x, this_vehicle_position.y, this_vehicle_position.z, 0) < 1.0);
+						bool too_close_to_another_point = (GetDistanceBetween3DCoords(this_vehicle_position, item) < 1.0);
 						return (too_close_to_another_point);
 					};
 					bool found_in_vector = (std::find_if(vector_of_vector4s.begin(), vector_of_vector4s.end(), predicate) != vector_of_vector4s.end()); // make sure this_vehicle_position does not already exist in vector_of_vector4s
