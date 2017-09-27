@@ -16,6 +16,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ConsoleApplication1", "ConsoleApplication1\ConsoleApplication1.vcxproj", "{690C4C88-3774-441F-9AAE-9F64A3201602}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Benchmarking", "Benchmarking\Benchmarking.vcxproj", "{F8D68E6A-0A44-4FD8-998D-4D20043CD2CD}"
+EndProject
 Global
 	GlobalSection(Performance) = preSolution
 		HasPerformanceSessions = true
@@ -41,12 +43,23 @@ Global
 		{690C4C88-3774-441F-9AAE-9F64A3201602}.Release|x64.Build.0 = Release|x64
 		{690C4C88-3774-441F-9AAE-9F64A3201602}.Release|x86.ActiveCfg = Release|Win32
 		{690C4C88-3774-441F-9AAE-9F64A3201602}.Release|x86.Build.0 = Release|Win32
+		{F8D68E6A-0A44-4FD8-998D-4D20043CD2CD}.Debug|x64.ActiveCfg = Debug|x64
+		{F8D68E6A-0A44-4FD8-998D-4D20043CD2CD}.Debug|x64.Build.0 = Debug|x64
+		{F8D68E6A-0A44-4FD8-998D-4D20043CD2CD}.Debug|x86.ActiveCfg = Debug|Win32
+		{F8D68E6A-0A44-4FD8-998D-4D20043CD2CD}.Debug|x86.Build.0 = Debug|Win32
+		{F8D68E6A-0A44-4FD8-998D-4D20043CD2CD}.Release|x64.ActiveCfg = Release|x64
+		{F8D68E6A-0A44-4FD8-998D-4D20043CD2CD}.Release|x64.Build.0 = Release|x64
+		{F8D68E6A-0A44-4FD8-998D-4D20043CD2CD}.Release|x86.ActiveCfg = Release|Win32
+		{F8D68E6A-0A44-4FD8-998D-4D20043CD2CD}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9D0EE87F-6C64-49BA-B918-2161130A7149}
+	EndGlobalSection
+	GlobalSection(Performance) = preSolution
+		HasPerformanceSessions = true
 	EndGlobalSection
 	GlobalSection(Performance) = preSolution
 		HasPerformanceSessions = true

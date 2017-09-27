@@ -19,6 +19,7 @@
 #include <chrono>
 #include <ratio>
 #include <numeric>
+#include <cmath>
 
 CIniReader Reader(".\\OnlineEventsRedux.ini");
 Log Logger(".\\OnlineEventsRedux.log", LogNormal);
@@ -145,6 +146,16 @@ inline double GetDistanceBetween3DCoords(Vector4 vec_a, Vector4 vec_b) {
 	return std::sqrt(std::pow(vec_a.x - vec_b.x, 2) + std::pow(vec_a.y - vec_b.y, 2) + std::pow(vec_a.z - vec_b.z, 2));
 }
 
+inline bool GetIsDistanceBetween3DCoordsLessThan( Vector4 vec_a, Vector4 vec_b, double distance ) {
+	if ( !(std::abs( vec_a.x - vec_b.x ) < distance) ) return false;
+	if ( !(std::abs( vec_a.x - vec_b.x ) < distance) ) return false;
+	if ( !(std::abs( vec_a.x - vec_b.x ) < distance) ) return false;
+	if ( !std::sqrt( std::pow( vec_a.x - vec_b.x, 2 )
+		+ std::pow( vec_a.y - vec_b.y, 2 )
+		+ std::pow( vec_a.z - vec_b.z, 2 ) < distance ) ) return false;
+	return true;
+}
+
 inline float GetGroundZAtThisLocation(Vector4 v4) {
 	if (v4.z > 1000.0f) {
 		Logger.Write("GetGroundZAtThisLocation(): v4.z is already over 1000, something went wrong!", LogError);
@@ -163,7 +174,6 @@ inline float GetGroundZAtThisLocation(Vector4 v4) {
 }
 
 inline double GetFromUniformRealDistribution(double first, double second) {
-	
 	std::uniform_real_distribution<> uniform_real_distribution(first, second);
 	double result =  uniform_real_distribution(generator);
 	Logger.Write("GetFromUniformRealDistribution( " + std::to_string(first) + ", " + std::to_string(second) + " ): " + std::to_string(result), LogDebug);
@@ -306,13 +316,12 @@ inline std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vect
 				Vehicle this_vehicle = all_world_vehicles[i];
 				Vector4 this_vehicle_position = { GetVector4OfEntity(this_vehicle) };
 				if (DoesEntityExistAndIsNotNull(this_vehicle) &&
+					GetDistanceBetween3DCoords( player_position, this_vehicle_position ) > search_range_minimum &&
 					IsVehicleDrivable(this_vehicle) && // is the vehicle a car/bike/etc and can the player start driving it?
 					IsVehicleProbablyParked(this_vehicle) && // not moving, no driver?
 					!(VEHICLE::GET_LAST_PED_IN_VEHICLE_SEAT(this_vehicle, -1) == player_ped) && // probably not previously used by the player? We can hope?
 					!(VEHICLE::_IS_VEHICLE_DAMAGED(this_vehicle)) && // probably not an empty car in the street as a result of a pileup...
-					(VEHICLE::_IS_VEHICLE_SHOP_RESPRAY_ALLOWED(this_vehicle)) && // this doesn't seem to work...
-					//GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_position.x, player_position.y, player_position.z, this_vehicle_position.x, this_vehicle_position.y, this_vehicle_position.z, 0) > search_range_minimum
-					GetDistanceBetween3DCoords(player_position, this_vehicle_position) > search_range_minimum
+					(VEHICLE::_IS_VEHICLE_SHOP_RESPRAY_ALLOWED(this_vehicle)) // this doesn't seem to work...
 					) {
 					// CHECK WHETHER THERE IS A BLIP ATTACHED TO THIS VEHICLE
 					std::chrono::high_resolution_clock::time_point time_point_at_search_current = std::chrono::high_resolution_clock::now();
@@ -323,7 +332,6 @@ inline std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vect
 						times_waited += 1;
 						Wait(0); // The ifs should be fast, but comparing ~150 vehicles in the game world to upwards of 4000 spawn points actually takes appreciable time. Wait(0) hands control back to the game engine for a tick, making sure we don't slow the game down.
 					}
-
 					auto predicate = [this_vehicle_position](const Vector4 & item) { // didn't want to define a lambda inline, it gets ugly fast.
 						bool too_close_to_another_point = (GetDistanceBetween3DCoords(this_vehicle_position, item) < 1.0);
 						return (too_close_to_another_point);
@@ -349,10 +357,6 @@ inline std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vect
 	if (times_waited > 0) {
 		Logger.Write("GetParkedCarsFromWorld(): times_waited:" + std::to_string(times_waited) + ",  time to complete: " + std::to_string(ticks_taken_to_complete_search) + ",  vehicles: " + std::to_string(count) + ",  vector size: " + std::to_string(vector_of_vector4s.size()), LogDebug);
 	}
-	//if (ticks_taken_to_complete_search > DEBUG_milliseconds_above_which_to_warn) {
-	//	Logger.Write("GetParkedCarsFromWorld(): ticks_taken_to_complete_search: " + std::to_string(ticks_taken_to_complete_search) + ", all_world_vehicles: " + std::to_string(count) + ", vector_of_vector4s.size(): " + std::to_string(vector_of_vector4s.size()), LogDebug);
-	//	DEBUG_milliseconds_above_which_to_warn = ticks_taken_to_complete_search;
-	//}
 	return vector_of_vector4s;
 }
 

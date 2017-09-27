@@ -1,4 +1,4 @@
-// ConsoleApplication1.cpp : Defines the entry point for the console application.
+// Benchmarking.cpp : Defines the entry point for the console application.
 //
 
 #include "stdafx.h"
@@ -48,8 +48,8 @@ struct Vector4 {
 	float h = 0.0;
 };
 
-std::random_device random_device; 
-std::mt19937 generator(::random_device()); // init a standard mersenne_twister_engine
+std::random_device random_device;
+std::mt19937 generator( ::random_device() ); // init a standard mersenne_twister_engine
 std::vector<Vector4> vector_a;
 std::vector<Vector4> vector_b;
 //std::vector<Vector4> vector_c;
@@ -85,7 +85,7 @@ inline bool GetIsDistanceBetween3DCoordsLessThan( Vector4 vec_a, Vector4 vec_b, 
 	return true;
 }
 
-int myrandom( int i ) { return GetFromUniformIntDistribution(0,RAND_MAX) % i; }
+int myrandom( int i ) { return GetFromUniformIntDistribution( 0, RAND_MAX ) % i; }
 
 std::vector<Vector4> PopulateVectors( std::vector<Vector4> vector, unsigned count ) {
 	for ( unsigned i = 0; i < count; i++ ) {
@@ -99,7 +99,7 @@ std::vector<Vector4> PopulateVectors( std::vector<Vector4> vector, unsigned coun
 }
 
 unsigned BenchmarkGetDistanceBetween3DCoords( std::vector<Vector4> vector_a, std::vector<Vector4> vector_b ) {
-	
+
 	clock_t clicks = clock();
 	unsigned time_stamp_counter = rdtsc();
 	std::vector<Vector4> vector_c;
@@ -141,7 +141,7 @@ int main() {
 	clock_t clicks = clock(); unsigned time_stamp_counter = rdtsc();
 	vector_a = PopulateVectors( vector_a, vectors_size );
 	vector_b = PopulateVectors( vector_b, vectors_size * 10 );
-	for (Vector4 v : vector_a ) {
+	for ( Vector4 v : vector_a ) {
 		if ( GetFromUniformRealDistribution( 0, 1 ) < 0.5f ) {
 			vector_b.push_back( v );
 		}
