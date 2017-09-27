@@ -320,7 +320,7 @@ inline std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vect
 					float ticks_taken_by_search_so_far = time_span.count() * 1000;
 					if (ticks_taken_by_search_so_far > 15.0f) {
 						std::chrono::high_resolution_clock::time_point time_point_at_this_loop_instance = std::chrono::high_resolution_clock::now();
-						//times_waited += 1;
+						times_waited += 1;
 						Wait(0); // The ifs should be fast, but comparing ~150 vehicles in the game world to upwards of 4000 spawn points actually takes appreciable time. Wait(0) hands control back to the game engine for a tick, making sure we don't slow the game down.
 					}
 
@@ -346,10 +346,9 @@ inline std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vect
 	std::chrono::high_resolution_clock::time_point time_point_at_search_end = std::chrono::high_resolution_clock::now();
 	std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(time_point_at_search_end - time_point_at_search_start);
 	float ticks_taken_to_complete_search = time_span.count() * 1000;
-	//if (times_waited > DEBUG_waits_above_which_to_warn) {
-	//	Logger.Write("GetParkedCarsFromWorld(): times_waited:" + std::to_string(times_waited) + ",  time to complete: " + std::to_string(ticks_taken_to_complete_search) + ",  vehicles: " + std::to_string(count) + ",  vector size: " + std::to_string(vector_of_vector4s.size()), LogDebug);
-	//	DEBUG_waits_above_which_to_warn = times_waited;
-	//}
+	if (times_waited > 0) {
+		Logger.Write("GetParkedCarsFromWorld(): times_waited:" + std::to_string(times_waited) + ",  time to complete: " + std::to_string(ticks_taken_to_complete_search) + ",  vehicles: " + std::to_string(count) + ",  vector size: " + std::to_string(vector_of_vector4s.size()), LogDebug);
+	}
 	//if (ticks_taken_to_complete_search > DEBUG_milliseconds_above_which_to_warn) {
 	//	Logger.Write("GetParkedCarsFromWorld(): ticks_taken_to_complete_search: " + std::to_string(ticks_taken_to_complete_search) + ", all_world_vehicles: " + std::to_string(count) + ", vector_of_vector4s.size(): " + std::to_string(vector_of_vector4s.size()), LogDebug);
 	//	DEBUG_milliseconds_above_which_to_warn = ticks_taken_to_complete_search;
@@ -1545,7 +1544,7 @@ void ScriptMain() {
 		WaitDuringDeathArrestOrLoading(0);
 		Update();
 		MissionHandler.Update();
-		if (durations.size() == 600) {
+		if (durations.size() == 4096) {
 			double average = std::accumulate(durations.begin(), durations.end(), 0.0) / durations.size();
 			Logger.Write("ScriptMain(): profiler_duration (last " + std::to_string(durations.size()) + "):  " + std::to_string(average) + "  times_waited: " + std::to_string(times_waited), LogDebug);
 			times_waited = 0;
