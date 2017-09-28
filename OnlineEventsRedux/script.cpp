@@ -86,7 +86,7 @@ inline void NotifyBottomCenter(char* message) {
 	
 	UI::BEGIN_TEXT_COMMAND_PRINT("STRING");
 	UI::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME(message);
-	UI::END_TEXT_COMMAND_PRINT(2000, 1);
+	UI::END_TEXT_COMMAND_PRINT(6666, 1);
 	Logger.Write("NotifyBottomCenter(): " + std::string(message), LogVerbose);
 }
 
@@ -187,11 +187,11 @@ inline int GetFromUniformIntDistribution(int first, int second) {
 	return result;
 }
 
-inline bool IsTheUniverseFavorable(float probability) {
-	bool result = (GetFromUniformRealDistribution(0, 1) <= probability);
-	Logger.Write("IsTheUniverseFavorable(" + std::to_string(probability) + "): " + (result ? "Yes" : "No"), LogDebug);
-	return result;
-}
+//inline bool IsTheUniverseFavorable(float probability) {
+//	bool result = (GetFromUniformRealDistribution(0, 1) <= probability);
+//	Logger.Write("IsTheUniverseFavorable(" + std::to_string(probability) + "): " + (result ? "Yes" : "No"), LogDebug);
+//	return result;
+//}
 
 inline void ChangeMoneyForCurrentPlayer(int value, float modifier) {
 	value = int(value * modifier);
@@ -419,9 +419,7 @@ inline Ped SpawnACrateGuard(Ped skin, Vector4 crate_spawn_point, float x_margin,
 	Logger.Write("SpawnACrateGuard()", LogVerbose);
 	Vector4 spawn_point = crate_spawn_point;
 	spawn_point.x += GetFromUniformRealDistribution(-x_margin, x_margin); spawn_point.y += GetFromUniformRealDistribution(-y_margin, y_margin); spawn_point.z += GetFromUniformRealDistribution(-z_margin, z_margin);
-	
-	std::stringstream ss; ss << std::fixed << std::setprecision(2) << "SpawnACrateGuard() initial point(" << spawn_point.x << ", " << spawn_point.y << ", " << spawn_point.z << ")"; Logger.Write(ss.str(), LogDebug);
-	
+
 	float ground_z_at_spawn_point = GetGroundZAtThisLocation(spawn_point);
 	if (ground_z_at_spawn_point == 9999) {
 		Vector3 closest_vehicle_node;
@@ -438,16 +436,16 @@ inline Ped SpawnACrateGuard(Ped skin, Vector4 crate_spawn_point, float x_margin,
 	while (!ENTITY::DOES_ENTITY_EXIST(bad_guy)) Wait(0);
 	PED::SET_PED_RELATIONSHIP_GROUP_HASH(bad_guy, GAMEPLAY::GET_HASH_KEY("HATES_PLAYER"));
 	if (weapon = "SURPRISE_ME") {
-		if (IsTheUniverseFavorable(0.005)) weapon = "WEAPON_RAILGUN";
-		else if (IsTheUniverseFavorable(0.01)) weapon = "WEAPON_RPG";
-		else if (IsTheUniverseFavorable(0.02)) weapon = "WEAPON_GRENADELAUNCHER";
-		else if (IsTheUniverseFavorable(0.04)) weapon = "WEAPON_MG";
-		else if (IsTheUniverseFavorable(0.12)) weapon = "WEAPON_SNIPERRIFLE";
-		else if (IsTheUniverseFavorable(0.24)) weapon = "WEAPON_CARBINERIFLE";
-		else if (IsTheUniverseFavorable(0.33)) weapon = "WEAPON_SMG";
-		else if (IsTheUniverseFavorable(0.33)) weapon = "WEAPON_PUMPSHOTGUN";
-		else if (IsTheUniverseFavorable(0.24)) weapon = "WEAPON_PISTOL50";
-		else if (IsTheUniverseFavorable(0.24)) weapon = "WEAPON_COMBATPISTOL";
+		if (GetFromUniformRealDistribution(0, 1) <= (0.005)) weapon = "WEAPON_RAILGUN";
+		else if (GetFromUniformRealDistribution(0, 1) <= (0.01)) weapon = "WEAPON_RPG";
+		else if (GetFromUniformRealDistribution(0, 1) <= (0.02)) weapon = "WEAPON_GRENADELAUNCHER";
+		else if (GetFromUniformRealDistribution(0, 1) <= (0.04)) weapon = "WEAPON_MG";
+		else if (GetFromUniformRealDistribution(0, 1) <= (0.12)) weapon = "WEAPON_SNIPERRIFLE";
+		else if (GetFromUniformRealDistribution(0, 1) <= (0.24)) weapon = "WEAPON_CARBINERIFLE";
+		else if (GetFromUniformRealDistribution(0, 1) <= (0.33)) weapon = "WEAPON_SMG";
+		else if (GetFromUniformRealDistribution(0, 1) <= (0.33)) weapon = "WEAPON_PUMPSHOTGUN";
+		else if (GetFromUniformRealDistribution(0, 1) <= (0.24)) weapon = "WEAPON_PISTOL50";
+		else if (GetFromUniformRealDistribution(0, 1) <= (0.24)) weapon = "WEAPON_COMBATPISTOL";
 		else weapon = "WEAPON_PISTOL";
 	}
 	WEAPON::GIVE_DELAYED_WEAPON_TO_PED(bad_guy, GAMEPLAY::GET_HASH_KEY((char *)weapon), 1000, 1);
@@ -475,6 +473,7 @@ inline Ped SpawnACrateGuard(Ped skin, Vector4 crate_spawn_point, float x_margin,
 	//AI::TASK_GUARD_CURRENT_POSITION(bad_guy, 10.0f, 10.0f, 1);
 
 	ENTITY::SET_ENTITY_INVINCIBLE(bad_guy, false);
+	std::stringstream ss; ss << std::fixed << std::setprecision(2) << "SpawnACrateGuard(): Ped spawned at ( " << spawn_point.x << ", " << spawn_point.y << ", " << spawn_point.z << " )"; Logger.Write(ss.str(), LogDebug);
 	return bad_guy;
 }
 
@@ -501,7 +500,7 @@ MissionType CrateDropMission::Prepare() {
 	crate_spawn_location_ = SelectASpawnPoint(player_position, crate_spawn_points, empty_vector, spawn_point_maximum_range, spawn_point_minimum_range, NULL);
 	Logger.Write("CrateDropMission::Prepare(): crate_spawn_location: ( " + std::to_string(crate_spawn_location_.x) + ", " + std::to_string(crate_spawn_location_.y) + " )", LogNormal);
 	if (crate_spawn_location_.x == 0.0f && crate_spawn_location_.y == 0.0f && crate_spawn_location_.z == 0.0f && crate_spawn_location_.h == 0.0f) return NO_Mission;
-	if (IsTheUniverseFavorable(0.05)) crate_is_special_ = true; else crate_is_special_ = false;
+	if (GetFromUniformRealDistribution(0, 1) <= (0.05)) crate_is_special_ = true; else crate_is_special_ = false;
 	crate_blip_ = UI::ADD_BLIP_FOR_COORD(crate_spawn_location_.x, crate_spawn_location_.y, crate_spawn_location_.z);
 	if (use_default_blip) UI::SET_BLIP_SPRITE(crate_blip_, 1); 
 	else UI::SET_BLIP_SPRITE(crate_blip_, 306); 
@@ -550,7 +549,7 @@ MissionType CrateDropMission::Execute() {
 		if (crate_is_special_) number_of_guards = round(number_of_guards_to_spawn * 1.5);
 		for (uint i = 0; i < number_of_guards; i++) {
 			Logger.Write("CrateDropMission::Execute(): spawning a bad guy", LogNormal);
-			guards_.insert(SpawnACrateGuard(skin_, crate_spawn_location_, 20, 20, 20, "SURPRISE_ME"));
+			guards_.insert(SpawnACrateGuard(skin_, crate_spawn_location_, 11, 11, 11, "SURPRISE_ME"));
 		}
 		Logger.Write("CrateDropMission::Execute(): guards were spawned", LogNormal);
 		objects_were_spawned_ = true;
@@ -564,14 +563,19 @@ MissionType CrateDropMission::Execute() {
 		for (Ped guard : guards_) {
 			if (PED::IS_PED_DEAD_OR_DYING(guard, 1)) {
 				guards_.erase(guard);
+				Blip blip = UI::GET_BLIP_FROM_ENTITY(guard);
+				UI::REMOVE_BLIP(&blip);
 				ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard);
 				num_guard_to_respawn += 1;
 			}	
 		}
 		for (Ped guard : guards_) {
 			PED::SET_PED_ALERTNESS(guard, max_ped_alertness);
-			if (PED::_0x6CD5A433374D4CFB(player_ped, guard)) {
-				if (!UI::DOES_BLIP_EXIST(UI::GET_BLIP_FROM_ENTITY(guard))) UI::ADD_BLIP_FOR_ENTITY(guard);
+			if (ENTITY::HAS_ENTITY_CLEAR_LOS_TO_ENTITY_IN_FRONT(player_ped, guard)) {
+				if (!UI::DOES_BLIP_EXIST(UI::GET_BLIP_FROM_ENTITY(guard))) {
+					Blip blip = UI::ADD_BLIP_FOR_ENTITY(guard);
+					UI::SET_BLIP_SCALE(blip, 0.75f);
+				}
 			}
 			else if (UI::DOES_BLIP_EXIST(UI::GET_BLIP_FROM_ENTITY(guard))) {
 				Blip blip = UI::GET_BLIP_FROM_ENTITY(guard);
@@ -581,15 +585,19 @@ MissionType CrateDropMission::Execute() {
 		for (uint i = 0; i < num_guard_to_respawn; i++) {
 			STREAMING::REQUEST_MODEL(skin_);
 			while (!STREAMING::HAS_MODEL_LOADED(skin_)) Wait(0);
-			guards_.insert(SpawnACrateGuard(skin_, crate_spawn_location_, 40, 40, 40, "SURPRISE_ME"));
+			guards_.insert(SpawnACrateGuard(skin_, crate_spawn_location_, 33, 33, 33, "SURPRISE_ME"));
 		}
 	}
 
 	if (objects_were_spawned_ && !ENTITY::DOES_ENTITY_EXIST(crate_)) {
 		for (Ped guard : guards_) {
-			ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard);
-			guards_.clear();
+			if (UI::DOES_BLIP_EXIST(UI::GET_BLIP_FROM_ENTITY(guard))) {
+				Blip blip = UI::GET_BLIP_FROM_ENTITY(guard);
+				UI::REMOVE_BLIP(&blip);
+				ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard);
+			}
 		}
+		guards_.clear();
 		if (crate_is_special_) ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(50000, 150000), mission_reward_modifier);
 		else ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(25000, 75000), mission_reward_modifier);
 		CreateNotification("The drop was acquired.", play_notification_beeps);
@@ -655,7 +663,7 @@ MissionType ArmoredTruckMission::Prepare() {
 	STREAMING::REQUEST_MODEL(skin_);
 	while (!STREAMING::HAS_MODEL_LOADED(skin_)) Wait(0);
 	truck_driver_ = PED::CREATE_PED_INSIDE_VEHICLE(armored_truck_, 26, skin_, -1, false, false);
-	if (IsTheUniverseFavorable(0.5)) truck_passenger_ = PED::CREATE_PED_INSIDE_VEHICLE(armored_truck_, 26, skin_, 0, false, false);
+	if (GetFromUniformRealDistribution(0, 1) <= (0.5)) truck_passenger_ = PED::CREATE_PED_INSIDE_VEHICLE(armored_truck_, 26, skin_, 0, false, false);
 	VEHICLE::SET_VEHICLE_DOORS_LOCKED(armored_truck_, 2);
 	Wait(0);
 	if (ENTITY::DOES_ENTITY_EXIST(truck_driver_)) AI::TASK_VEHICLE_DRIVE_WANDER(truck_driver_, armored_truck_, 10.0f, 153);
@@ -905,10 +913,10 @@ MissionType StealVehicleMission::Prepare() {
 	drop_off_coordinates.x = 1226.06; drop_off_coordinates.y = -3231.36; drop_off_coordinates.z = 5.02;
 	
 	stealable_vehicle_flags = stealable_vehicle_classes; // we want some sort of weighted distribution of cars to steal...
-	if (IsTheUniverseFavorable(0.6666)) stealable_vehicle_flags = stealable_vehicle_flags & ~Super; // disallow Supers 66% of the time.
-	if (IsTheUniverseFavorable(0.3333)) stealable_vehicle_flags = stealable_vehicle_flags & ~Sports; // disallow Sports 33% of the time.
-	if (IsTheUniverseFavorable(0.3333)) stealable_vehicle_flags = stealable_vehicle_flags & ~SportsClassic; // etc...
-	if (IsTheUniverseFavorable(0.3333)) stealable_vehicle_flags = stealable_vehicle_flags & ~OffRoad; // etc...
+	if (GetFromUniformRealDistribution(0, 1) <= (0.6666)) stealable_vehicle_flags = stealable_vehicle_flags & ~Super; // disallow Supers 66% of the time.
+	if (GetFromUniformRealDistribution(0, 1) <= (0.3333)) stealable_vehicle_flags = stealable_vehicle_flags & ~Sports; // disallow Sports 33% of the time.
+	if (GetFromUniformRealDistribution(0, 1) <= (0.3333)) stealable_vehicle_flags = stealable_vehicle_flags & ~SportsClassic; // etc...
+	if (GetFromUniformRealDistribution(0, 1) <= (0.3333)) stealable_vehicle_flags = stealable_vehicle_flags & ~OffRoad; // etc...
 	vehicle_hash_ = SelectAVehicleModel(possible_vehicle_models, stealable_vehicle_flags);
 	if (vehicle_hash_ == NULL) return NO_Mission;
 	Vector4 vehicle_spawn_position = SelectASpawnPoint(player_position, vehicle_spawn_points, reserved_vehicle_spawn_points, spawn_point_maximum_range, spawn_point_minimum_range, vehicle_hash_);
@@ -919,8 +927,8 @@ MissionType StealVehicleMission::Prepare() {
 	vehicle_to_steal_ = VEHICLE::CREATE_VEHICLE(vehicle_hash_, vehicle_spawn_position.x, vehicle_spawn_position.y, vehicle_spawn_position.z, vehicle_spawn_position.h, 0, 0);
 	VEHICLE::SET_VEHICLE_ON_GROUND_PROPERLY(vehicle_to_steal_);
 	//if (IsTheUniverseFavorable(1.0)) VEHICLE::SET_VEHICLE_IS_STOLEN(vehicle_to_steal_, true); // doesn't work.
-	if (IsTheUniverseFavorable(0.6666)) VEHICLE::SET_VEHICLE_DOORS_LOCKED(vehicle_to_steal_, 7); 
-	if (IsTheUniverseFavorable(0.6666)) VEHICLE::SET_VEHICLE_NEEDS_TO_BE_HOTWIRED(vehicle_to_steal_, true);
+	if (GetFromUniformRealDistribution(0, 1) <= (0.6666)) VEHICLE::SET_VEHICLE_DOORS_LOCKED(vehicle_to_steal_, 7);
+	if (GetFromUniformRealDistribution(0, 1) <= (0.6666)) VEHICLE::SET_VEHICLE_NEEDS_TO_BE_HOTWIRED(vehicle_to_steal_, true);
 	vehicle_blip_ = UI::ADD_BLIP_FOR_ENTITY(vehicle_to_steal_);
 	if (use_default_blip) UI::SET_BLIP_SPRITE(vehicle_blip_, 1);
 	else if (VEHICLE::IS_THIS_MODEL_A_CAR(vehicle_hash_)) UI::SET_BLIP_SPRITE(vehicle_blip_, 225);
@@ -928,7 +936,7 @@ MissionType StealVehicleMission::Prepare() {
 	UI::SET_BLIP_COLOUR(vehicle_blip_, 5);
 	UI::SET_BLIP_DISPLAY(vehicle_blip_, (char)"you will never see this");
 	VEHICLE::GET_VEHICLE_COLOURS(vehicle_to_steal_, &vehicle_primary_color_initial_, &vehicle_secondary_color_initial_);
-	if (IsTheUniverseFavorable(0.1666)) {
+	if (GetFromUniformRealDistribution(0, 1) <= (0.1666)) {
 		vehicle_must_be_undamaged_ = true;
 		CreateNotification("A special ~y~vehicle~w~ has been requested for retrieval.", play_notification_beeps);
 		Wait(1500);
@@ -952,9 +960,9 @@ MissionType StealVehicleMission::Execute() {
 
 	if (mission_objective_ == GetCar) {
 		if (PED::IS_PED_IN_VEHICLE(player_ped, vehicle_to_steal_, 0)) {
-			if (GetVehicleClassBitwiseFromHash(vehicle_hash_) == Super && IsTheUniverseFavorable(0.3333)) SetPlayerMinimumWantedLevel(Wanted_Three);
-			else if (IsTheUniverseFavorable(0.3333)) SetPlayerMinimumWantedLevel(Wanted_Two);
-			else if (IsTheUniverseFavorable(0.6666)) SetPlayerMinimumWantedLevel(Wanted_One);
+			if (GetVehicleClassBitwiseFromHash(vehicle_hash_) == Super && GetFromUniformRealDistribution(0, 1) <= (0.3333)) SetPlayerMinimumWantedLevel(Wanted_Three);
+			else if (GetFromUniformRealDistribution(0, 1) <= (0.3333)) SetPlayerMinimumWantedLevel(Wanted_Two);
+			else if (GetFromUniformRealDistribution(0, 1) <= (0.6666)) SetPlayerMinimumWantedLevel(Wanted_One);
 			CreateNotification("Respray the ~y~vehicle~w~ before turning it in.", play_notification_beeps);
 			mission_objective_ = ResprayCar;
 		}
@@ -1070,16 +1078,16 @@ Ped BadGuyHandler::CreateABadGuy(Vector4 origin_vector, char * skin, float x_mar
 	PED::SET_PED_RELATIONSHIP_GROUP_HASH(this_ped, GAMEPLAY::GET_HASH_KEY("HATES_PLAYER"));
 	if (weapon != "NONE") {
 		if (weapon == "SURPRISE_ME") {
-			if (IsTheUniverseFavorable(0.01)) weapon = "WEAPON_RAILGUN";
-			else if (IsTheUniverseFavorable(0.04)) weapon = "WEAPON_RPG";
-			else if (IsTheUniverseFavorable(0.04)) weapon = "WEAPON_GRENADELAUNCHER";
-			else if (IsTheUniverseFavorable(0.04)) weapon = "WEAPON_MG";
-			else if (IsTheUniverseFavorable(0.12)) weapon = "WEAPON_SNIPERRIFLE";
-			else if (IsTheUniverseFavorable(0.24)) weapon = "WEAPON_CARBINERIFLE";
-			else if (IsTheUniverseFavorable(0.33)) weapon = "WEAPON_SMG";
-			else if (IsTheUniverseFavorable(0.33)) weapon = "WEAPON_PUMPSHOTGUN";
-			else if (IsTheUniverseFavorable(0.24)) weapon = "WEAPON_PISTOL50";
-			else if (IsTheUniverseFavorable(0.24)) weapon = "WEAPON_COMBATPISTOL";
+			if (GetFromUniformRealDistribution(0, 1) <= (0.01)) weapon = "WEAPON_RAILGUN";
+			else if (GetFromUniformRealDistribution(0, 1) <= (0.04)) weapon = "WEAPON_RPG";
+			else if (GetFromUniformRealDistribution(0, 1) <= (0.04)) weapon = "WEAPON_GRENADELAUNCHER";
+			else if (GetFromUniformRealDistribution(0, 1) <= (0.04)) weapon = "WEAPON_MG";
+			else if (GetFromUniformRealDistribution(0, 1) <= (0.12)) weapon = "WEAPON_SNIPERRIFLE";
+			else if (GetFromUniformRealDistribution(0, 1) <= (0.24)) weapon = "WEAPON_CARBINERIFLE";
+			else if (GetFromUniformRealDistribution(0, 1) <= (0.33)) weapon = "WEAPON_SMG";
+			else if (GetFromUniformRealDistribution(0, 1) <= (0.33)) weapon = "WEAPON_PUMPSHOTGUN";
+			else if (GetFromUniformRealDistribution(0, 1) <= (0.24)) weapon = "WEAPON_PISTOL50";
+			else if (GetFromUniformRealDistribution(0, 1) <= (0.24)) weapon = "WEAPON_COMBATPISTOL";
 			else weapon = "WEAPON_PISTOL";
 		}
 		try {
@@ -1540,7 +1548,7 @@ void ScriptMain() {
 	if ( !load_without_notification ) CreateNotification("~b~Online Events Redux!~w~ (v1.1.2)", play_notification_beeps);
 	MissionHandler MissionHandler;
 
-	std::vector<double> durations;
+	std::vector<double> profiles_count;
 
 	while (true) {
 		WAIT(0);
@@ -1548,13 +1556,15 @@ void ScriptMain() {
 		WaitDuringDeathArrestOrLoading(0);
 		Update();
 		MissionHandler.Update();
-		if (durations.size() == 4096) {
-			double average = std::accumulate(durations.begin(), durations.end(), 0.0) / durations.size();
-			Logger.Write("ScriptMain(): profiler_duration (last " + std::to_string(durations.size()) + "):  " + std::to_string(average) + "  times_waited: " + std::to_string(times_waited), LogDebug);
+		if (profiles_count.size() == 2048) {
+			double average = std::accumulate(profiles_count.begin(), profiles_count.end(), 0.0) / profiles_count.size();
+			std::string profiler_string = "ScriptMain(): profiler_duration (last " + std::to_string(profiles_count.size()) + "):  " + std::to_string(average) + "  times_waited: " + std::to_string(times_waited);
+			Logger.Write(profiler_string, LogDebug);
+			NotifyBottomCenter(&profiler_string[0]);
 			times_waited = 0;
-			durations.clear();
+			profiles_count.clear();
 		}
-		durations.push_back((std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - loop_start)).count() * 1000);
+		profiles_count.push_back((std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - loop_start)).count() * 1000);
 	}
 
 	Logger.Close(); // I don't think this will ever happen...
