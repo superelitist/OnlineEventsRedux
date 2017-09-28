@@ -38,7 +38,6 @@ Ped player_ped;
 Vector4 player_position; // these get set every update
 std::vector<Vector4> reserved_vehicle_spawn_points;
 std::vector<Vector4> vehicle_spawn_points;
-std::vector<Vector4> crate_spawn_points;
 std::vector<Vector4> special_marker_points;
 std::vector<Hash> possible_vehicle_models;
 std::set<Blip> crate_spawn_blips;
@@ -1387,135 +1386,6 @@ void UglyHackForVehiclePersistenceScripts(uint seconds) {
 	return;
 }
 
-void PopulateCrateSpawnPoints() {
-	Logger.Write("PopulateCrateSpawnPoints()", LogNormal);
-	Vector4 v;
-	v.x = -1782.33f; v.y = -826.29f; v.z = 7.83f; crate_spawn_points.push_back(v);
-	v.x = 1067.85; v.y = 2362.45; v.z = 43.87; crate_spawn_points.push_back(v);
-	v.x = -3.77; v.y = 6840.14; v.z = 13.46; crate_spawn_points.push_back(v);
-	v.x = 2061.37; v.y = 2798.68; v.z = 50.29; crate_spawn_points.push_back(v);
-	v.x = 1883.24; v.y = 278.48; v.z = 162.73; crate_spawn_points.push_back(v);
-	v.x = -2912.36; v.y = 3077.48; v.z = 3.39; crate_spawn_points.push_back(v);
-	v.x = 2822.70; v.y = -634.39; v.z = 2.15; crate_spawn_points.push_back(v);
-	v.x = 2184.12; v.y = 5026.099; v.z = 42.63; crate_spawn_points.push_back(v);
-	v.x = -3147.02; v.y = 305.27; v.z = 2.35; crate_spawn_points.push_back(v);
-	v.x = 1552.40; v.y = 6644.04; v.z = 2.55; crate_spawn_points.push_back(v);
-	v.x = -2304.537f; v.y = 262.2341f; v.z = 193.945f; crate_spawn_points.push_back(v);
-	v.x = -2209.605f; v.y = 263.9533f; v.z = 198.6931f; crate_spawn_points.push_back(v);
-	v.x = -2511.595f; v.y = 754.7787f; v.z = 301.7178f; crate_spawn_points.push_back(v);
-	v.x = -2226.397f; v.y = 1323.613f; v.z = 279.5038f; crate_spawn_points.push_back(v);
-	v.x = -2769.402f; v.y = 2236.872f; v.z = 14.79807f; crate_spawn_points.push_back(v);
-	v.x = -2065.972f; v.y = 2642.406f; v.z = 3.180124f; crate_spawn_points.push_back(v);
-	v.x = -1422.356f; v.y = 4213.885f; v.z = 45.70396f; crate_spawn_points.push_back(v);
-	v.x = -1560.503f; v.y = 4700.828f; v.z = 50.84795f; crate_spawn_points.push_back(v);
-	v.x = -579.4633f; v.y = 5355.008f; v.z = 70.21449f; crate_spawn_points.push_back(v);
-	v.x = -555.0269f; v.y = 5327.682f; v.z = 73.59966f; crate_spawn_points.push_back(v);
-	v.x = -547.8709f; v.y = 5347.65f; v.z = 93.12288f; crate_spawn_points.push_back(v);
-	v.x = 562.8429f; v.y = 5558.706f; v.z = 752.4953f; crate_spawn_points.push_back(v);
-	v.x = -98.11043f; v.y = 6162.649f; v.z = 31.57337f; crate_spawn_points.push_back(v);
-	v.x = -104.7409f; v.y = 6108.543f; v.z = 38.43243f; crate_spawn_points.push_back(v);
-	v.x = -217.0383f; v.y = 6120.326f; v.z = 57.27291f; crate_spawn_points.push_back(v);
-	v.x = -227.7454f; v.y = 6110.444f; v.z = 50.18562f; crate_spawn_points.push_back(v);
-	v.x = 41.67861f; v.y = 6315.054f; v.z = 38.85682f; crate_spawn_points.push_back(v);
-	v.x = -94.50124f; v.y = 6219.507f; v.z = 47.70927f; crate_spawn_points.push_back(v);
-	v.x = -220.5485f; v.y = 6582.34f; v.z = 2.26774f; crate_spawn_points.push_back(v);
-	v.x = 268.2607f; v.y = 7464.212f; v.z = 17.91446f; crate_spawn_points.push_back(v);
-	v.x = 280.1523f; v.y = 6784.653f; v.z = 15.69595f; crate_spawn_points.push_back(v);
-	v.x = 1291.311f; v.y = 6431.871f; v.z = 25.32446f; crate_spawn_points.push_back(v);
-	v.x = 1303.355f; v.y = 6499.489f; v.z = 11.97833f; crate_spawn_points.push_back(v);
-	v.x = 2221.784f; v.y = 6739.459f; v.z = 4.474561f; crate_spawn_points.push_back(v);
-	v.x = 3097.392f; v.y = 6023.569f; v.z = 121.772f; crate_spawn_points.push_back(v);
-	v.x = 2390.934f; v.y = 4847.299f; v.z = 41.21838f; crate_spawn_points.push_back(v);
-	v.x = 1899.238f; v.y = 4921.0f; v.z = 48.78231f; crate_spawn_points.push_back(v);
-	v.x = 2935.535f; v.y = 4280.06f; v.z = 75.04327f; crate_spawn_points.push_back(v);
-	v.x = 3609.92f; v.y = 3599.669f; v.z = 39.75811f; crate_spawn_points.push_back(v);
-	v.x = 2676.243f; v.y = 3500.523f; v.z = 53.30333f; crate_spawn_points.push_back(v);
-	v.x = 891.8394f; v.y = 3611.257f; v.z = 32.8242f; crate_spawn_points.push_back(v);
-	v.x = 1452.18f; v.y = 2785.904f; v.z = 52.62277f; crate_spawn_points.push_back(v);
-	v.x = 318.4728f; v.y = 2885.65f; v.z = 46.38283f; crate_spawn_points.push_back(v);
-	v.x = 2003.032f; v.y = 2931.225f; v.z = 56.96896f; crate_spawn_points.push_back(v);
-	v.x = 1058.081f; v.y = 2502.244f; v.z = 48.83367f; crate_spawn_points.push_back(v);
-	v.x = 1027.115f; v.y = 2448.026f; v.z = 49.56541f; crate_spawn_points.push_back(v);
-	v.x = 1545.006f; v.y = 2173.82f; v.z = 78.7978f; crate_spawn_points.push_back(v);
-	v.x = 2099.818f; v.y = 2328.063f; v.z = 94.28532f; crate_spawn_points.push_back(v);
-	v.x = -2634.70117; v.y = 1894.48462; v.z = 157.862579; crate_spawn_points.push_back(v);
-	v.x = -1841.75854; v.y = 2154.39526; v.z = 116.130348; crate_spawn_points.push_back(v);
-	v.x = -1446.22131; v.y = 1970.4447; v.z = 61.838871; crate_spawn_points.push_back(v);
-	v.x = -1096.9259; v.y = 2726.59619; v.z = 19.1022949; crate_spawn_points.push_back(v);
-	v.x = 1708.02563; v.y = 4923.96924; v.z = 42.0781403; crate_spawn_points.push_back(v);
-	v.x = 1653.19958; v.y = 4836.55127; v.z = 47.1712875; crate_spawn_points.push_back(v);
-	v.x = 1725.21545; v.y = 4734.19629; v.z = 42.3928528; crate_spawn_points.push_back(v);
-	v.x = 1633.39063; v.y = 3671.11646; v.z = 34.5487938; crate_spawn_points.push_back(v);
-	v.x = 1609.42236; v.y = 3574.56787; v.z = 38.7752113; crate_spawn_points.push_back(v);
-	v.x = 1510.98523; v.y = 3570.29736; v.z = 42.111927; crate_spawn_points.push_back(v);
-	v.x = 2108.14185; v.y = 3817.23462; v.z = 30.9716053; crate_spawn_points.push_back(v);
-	v.x = 2746.37769; v.y = 1580.25012; v.z = 50.6868744; crate_spawn_points.push_back(v);
-	v.x = 2750.29785; v.y = 1564.67126; v.z = 48.1517067; crate_spawn_points.push_back(v);
-	v.x = 2754.38599; v.y = 1425.8927; v.z = 20.8237171; crate_spawn_points.push_back(v);
-	v.x = 2788.12573; v.y = 1392.35254; v.z = 24.4499207; crate_spawn_points.push_back(v);
-	v.x = 2676.54053; v.y = 1534.66748; v.z = 24.497673; crate_spawn_points.push_back(v);
-	v.x = 2866.59448; v.y = 1506.53125; v.z = 24.5675468; crate_spawn_points.push_back(v);
-	v.x = 2283.73975; v.y = 1720.1095; v.z = 68.0406418; crate_spawn_points.push_back(v);
-	v.x = 1460.37366; v.y = 1040.00623; v.z = 114.248222; crate_spawn_points.push_back(v);
-	v.x = 2593.40894; v.y = 430.133057; v.z = 108.613701; crate_spawn_points.push_back(v);
-	v.x = 2545.3064; v.y = 370.586273; v.z = 110.04071; crate_spawn_points.push_back(v);
-	v.x = 2507.80664; v.y = -409.739929; v.z = 114.086868; crate_spawn_points.push_back(v);
-	v.x = 2821.85156; v.y = -1458.76123; v.z = 9.7190752; crate_spawn_points.push_back(v);
-	v.x = 1696.7771; v.y = -1709.14026; v.z = 112.501152; crate_spawn_points.push_back(v);
-	v.x = 1744.98755; v.y = -1684.07751; v.z = 112.678223; crate_spawn_points.push_back(v);
-	v.x = 1699.83374; v.y = -1556.15857; v.z = 112.63134; crate_spawn_points.push_back(v);
-	v.x = 1732.35425; v.y = -1521.74036; v.z = 115.184456; crate_spawn_points.push_back(v);
-	v.x = 1596.16492; v.y = -1658.53418; v.z = 89.3703079; crate_spawn_points.push_back(v);
-	v.x = 1562.51038; v.y = -1713.43921; v.z = 88.4879761; crate_spawn_points.push_back(v);
-	v.x = 1559.2605; v.y = -1708.96436; v.z = 88.3480911; crate_spawn_points.push_back(v);
-	v.x = 1574.18311; v.y = -1663.49475; v.z = 89.4274826; crate_spawn_points.push_back(v);
-	v.x = 1613.68591; v.y = -2260.32397; v.z = 108.94838; crate_spawn_points.push_back(v);
-	v.x = 1244.09473; v.y = -2570.61011; v.z = 43.0598335; crate_spawn_points.push_back(v);
-	v.x = 1261.57678; v.y = -2564.77979; v.z = 42.7178955; crate_spawn_points.push_back(v);
-	v.x = 1257.77966; v.y = -2377.60962; v.z = 50.8521957; crate_spawn_points.push_back(v);
-	v.x = 1216.38489; v.y = -2344.92798; v.z = 50.413208; crate_spawn_points.push_back(v);
-	v.x = 1087.51733; v.y = -2292.95288; v.z = 30.1843643; crate_spawn_points.push_back(v);
-	v.x = 1096.22327; v.y = -2224.61792; v.z = 31.3039932; crate_spawn_points.push_back(v);
-	v.x = 1126.4729; v.y = -2176.99316; v.z = 36.7420731; crate_spawn_points.push_back(v);
-	v.x = 1119.85742; v.y = -2179.03882; v.z = 31.8482265; crate_spawn_points.push_back(v);
-	v.x = 1048.14563; v.y = -1968.32898; v.z = 32.5628967; crate_spawn_points.push_back(v);
-	v.x = 1039.97913; v.y = -3087.92847; v.z = 5.90104437; crate_spawn_points.push_back(v);
-	v.x = 1241.1123; v.y = -3241.23901; v.z = 6.02876472; crate_spawn_points.push_back(v);
-	v.x = 570.564392; v.y = -3211.40918; v.z = 27.0867996; crate_spawn_points.push_back(v);
-	v.x = 591.274292; v.y = -3267.75488; v.z = 18.7288189; crate_spawn_points.push_back(v);
-	v.x = 218.393005; v.y = -3312.61523; v.z = 8.68161678; crate_spawn_points.push_back(v);
-	v.x = 270.648346; v.y = -3205.26611; v.z = 7.29445267; crate_spawn_points.push_back(v);
-	v.x = 228.561432; v.y = -3214.23242; v.z = 40.5356369; crate_spawn_points.push_back(v);
-	v.x = 119.516701; v.y = -2986.09106; v.z = 7.04078817; crate_spawn_points.push_back(v);
-	v.x = -36.7112122; v.y = -2688.86304; v.z = 6.00023174; crate_spawn_points.push_back(v);
-	v.x = -92.2896576; v.y = -2774.04712; v.z = 6.08212805; crate_spawn_points.push_back(v);
-	v.x = -290.513428; v.y = -2768.47144; v.z = 2.19529819; crate_spawn_points.push_back(v);
-	v.x = -295.888794; v.y = -2782.91162; v.z = 6.41079712; crate_spawn_points.push_back(v);
-	v.x = -306.747925; v.y = -2727.67139; v.z = 6.00029612; crate_spawn_points.push_back(v);
-	v.x = -439.655579; v.y = -2427.84082; v.z = 6.01600313; crate_spawn_points.push_back(v);
-	v.x = -260.825714; v.y = -2427.55835; v.z = 6.00063372; crate_spawn_points.push_back(v);
-	v.x = 114.783241; v.y = -2531.16724; v.z = 6.1494627; crate_spawn_points.push_back(v);
-	v.x = 153.116409; v.y = -2392.60303; v.z = 6.16605186; crate_spawn_points.push_back(v);
-	v.x = 311.005035; v.y = -2422.38965; v.z = 8.51550198; crate_spawn_points.push_back(v);
-	v.x = 231.001648; v.y = -2505.68774; v.z = 8.90652657; crate_spawn_points.push_back(v);
-	v.x = -684.103088; v.y = -2232.25806; v.z = 5.94209385; crate_spawn_points.push_back(v);
-	v.x = -528.398438; v.y = -2217.82202; v.z = 20.7181015; crate_spawn_points.push_back(v);
-	v.x = -825.743347; v.y = -2099.67236; v.z = 9.18818188; crate_spawn_points.push_back(v);
-	v.x = -967.372437; v.y = -2040.9375; v.z = 9.51188374; crate_spawn_points.push_back(v);
-	v.x = -1046.65015; v.y = -2271.66162; v.z = 14.9356508; crate_spawn_points.push_back(v);
-	v.x = -1078.97632; v.y = -2205.94946; v.z = 9.07134724; crate_spawn_points.push_back(v);
-	v.x = -1276.82861; v.y = -2048.06396; v.z = 3.99195409; crate_spawn_points.push_back(v);
-	v.x = -1020.82483; v.y = -2597.87402; v.z = 39.1049728; crate_spawn_points.push_back(v);
-	v.x = -889.504639; v.y = -2614.69385; v.z = 36.6049957; crate_spawn_points.push_back(v);
-	v.x = -945.872803; v.y = -2544.96338; v.z = 14.8565273; crate_spawn_points.push_back(v);
-	v.x = -889.125793; v.y = -2328.97925; v.z = -11.7327375; crate_spawn_points.push_back(v);
-	v.x = -611.426819; v.y = -1924.07605; v.z = 18.7743874; crate_spawn_points.push_back(v);
-	v.x = -457.259155; v.y = -2015.05298; v.z = 16.9318581; crate_spawn_points.push_back(v);
-	v.x = -401.050323; v.y = -1987.33069; v.z = 29.9463425; crate_spawn_points.push_back(v);
-	v.x = -566.903625; v.y = -1780.06775; v.z = 23.4318352; crate_spawn_points.push_back(v);
-	//v.x = 1120.81238; v.y = -2167.49976; v.z = 31.8482285; crate_spawn_points.push_back(v);
-}
-
 void GetSettingsFromIniFile() {
 	Logger.Write("GetSettingsFromIniFile()", LogNormal);
 	// OPTIONS
@@ -1561,7 +1431,6 @@ void Init() {
 		}
 	}
 	crate_spawn_file.open(".\\crate_spawn_file.xyz", std::fstream::in | std::fstream::out | std::fstream::app);
-	PopulateCrateSpawnPoints();
 }
 
 void ScriptMain() {
