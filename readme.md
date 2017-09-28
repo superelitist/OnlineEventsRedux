@@ -60,15 +60,15 @@ I've almost completely rewritten the code. It bears virtually no resemblance to 
 REQUIREMENTS
 -----------------------
 
-* GTA V 		v1.0.1032.1
-* Script Hook V	v1.0.1032.1		http://www.dev-c.com/gtav/scripthookv/
+* GTA V 		v1.0.1180.2
+* Script Hook V	v1.0.1180.2		http://www.dev-c.com/gtav/scripthookv/
 
 <a name="INSTALLATION"></a>
 
 INSTALLATION
 -----------------------
 
-Place OnlineEvents.asi and OnlineEvents.ini in the same folder as ScriptHookV.dll.
+Place OnlineEventsRedux.asi and OnlineEventsRedux.ini in the same folder as ScriptHookV.dll.
 
 <a name="CONFIGURATION"></a>
 
@@ -78,6 +78,8 @@ CONFIGURATION
 Here's where it gets interesting. The INI file has a lot of values. The defaults are what I settled on to provide balanced, fun gameplay. With few exceptions, you can set them to whatever you want- but extreme values may very well break the game. I will try to elaborate below. Bonus: I literally copied the OnlineEvents.ini. If you want to reset to defaults, you can just copy the following section back in.
 ```
 [OPTIONS]
+; Set to true to omit the notification at game start.
+load_without_notification=false
 ; Set to false to turn beeps off.
 play_notification_beeps=true
 ; Set to true to use plain circles instead of descriptive blips.
@@ -126,14 +128,13 @@ destroyable_vehicle_flags=788
 stealable_vehicle_flags=1023
 ;
 [DEBUG]
-; You can usually ignore all of these...
-; You can't turn logging entirely off, but you can change it some. 
-;	LogError			= 1, Only things that should never have happened.
-;	LogNormal			= 2, Some informational things, usually will only log once. Should get a couple lines a minute on this.
-;	LogVerbose			= 4, Some informational things that repeat a lot.
-;	LogVeryVerbose		= 8, Mostly to follow program flow, but spammy.
-;	LogExtremelyVerbose	= 16, These will probably send a hundred times a second. This should always be off, unless you want a log file larger than your GTA install.
-logging_level=1
+; You can usually ignore all of these... 
+; You can't turn logging entirely off, but you can change it some. The files usually don't get bigger than a MB though, so it's not a big deal.
+;	LogError		= 1, Only things that should never have happened.
+;	LogNormal		= 2, Some informational things, usually will only log once. Should get a couple lines a minute on this.
+;	LogVerbose		= 4, Some informational things that repeat a lot.
+;	LogDebug		= 8, Mostly to follow program flow, but spammy.
+logging_level=8
 ; Set this to about 10 or 15 seconds, and it will wait for the persistence script to load the vehicles, and then reserve those spawn points so they can't be used later.
 ; If this is set to 0 however, it won't wait or reserve spawns at all. It (mostly) works.
 seconds_to_wait_for_vehicle_persistence_scripts=0
@@ -152,15 +153,13 @@ maximum_number_of_vehicle_models=1000
 KNOWN ISSUES
 -----------------------
 
-* Vehicle Persistence. Since the script dynamically gathers spawn points (I wonder how many times I will type that), the 30-some vehicles that are spawned by the otherwise superlative 'I'm Not MentaL's Persistance Mod'[sic] are considered possible spawns, even though the game engine would normally never place vehicles where I parked most of mine... I have some techniques in place to try to avoid spawning vehicles where vehicles already exist, but I'm open to further ideas.
-
-* The script uses parked spawn points for the armored cars. This means that they spawn in parking garages with embarrassing regularity. This wouldn't be embarrassing, except that they generally have a difficult time navigating out. Sometimes, they literally give up and run away from the truck, which obviously makes the event rather trivial. Possible fixes include a) discovering un-parked spawn points (via my method, probably infeasible. I could gather millions or billions of points...), and b) checking for a roof over spawns (which won't prevent spawns on the roof of the garage, and will prevent otherwise legitimate spawns under freeways, etc...).
-
-* The doors on the armored truck must be blown open to get the reward, but it seems you're just as likely to blow the truck up. I tried to make the script open the doors when the player gets in the driver's seat, but for some reason it doesn't actually work until the player backs the truck up. Which is odd. I'm actively trying to figure out why.
+* The script uses parked spawn points for the armored cars, but they now spawn at the closest vehicle node for added safety. Unfortunately, they still sometimes get placed in difficult locations, like behind fences that they can't cross. I might have to set up some spawn exclusion zones.
 
 * The script will only spawn certain vehicle classes for steal missions, but certain vehicles still can't be resprayed (and VEHICLE::_IS_VEHICLE_SHOP_RESPRAY_ALLOWED() doesn't appear to work, at all), such as the Taxi. The most useful (but terribly inelegant) solution in the short term is probably to hard-code an exclude filter for unusable models, so please report any such vehicles.
 
-* The guards protecting the crate are supposed to wander around. They don't. I don't consider this high-priority (they still fight the player), but it's there.
+* The guards protecting the crate still sometimes get respawned right in front of the player, which is immersion breaking. I need to figure out how to ensure they spawn out of sight of the player.
+
+* Vehicle Persistence. Since the script dynamically gathers spawn points (I wonder how many times I will type that), the 30-some vehicles that are spawned by the otherwise superlative 'I'm Not MentaL's Persistance Mod'[sic] are considered possible spawns, even though the game engine would normally never place vehicles where I parked most of mine... I have some techniques in place to try to avoid spawning vehicles where vehicles already exist. Also, I stopped using a persistence mod and rolled my own version, so I'm probably not going to put more effort into this issue.
 
 * The script doesn't check for actual (like, story-mode) mission status, so... probably don't use this until you've finished the game.
 

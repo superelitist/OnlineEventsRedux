@@ -4,22 +4,23 @@
 #include "..\..\inc\INIReader.h"
 #include "..\..\inc\INIWriter.h"
 #include "..\..\inc\keyboard.h"
-#include "iostream"
-#include <iomanip>
+
 #include "Log.h"
 #include "script.h"
-#include "strings.h"
-#include <algorithm>
-#include <ctime>
-#include <random>
-#include <string>
-#include <sstream>
-#include <vector>
-#include <set>
 #include <chrono>
-#include <ratio>
+#include <iomanip>
 #include <numeric>
-#include <cmath>
+#include <random>
+#include <set>
+#include <sstream>
+//#include "iostream"
+//#include "strings.h"
+//#include <algorithm>
+//#include <cmath>
+//#include <ctime>
+//#include <ratio>
+//#include <string> // included in Log.h
+//#include <vector> // lol why don't I need to include this?
 
 CIniReader Reader(".\\OnlineEventsRedux.ini");
 Log Logger(".\\OnlineEventsRedux.log", LogNormal);
@@ -28,11 +29,6 @@ std::ofstream crate_spawn_file;
 
 #pragma warning(disable : 4244 4305) // double <-> float conversions
 #pragma warning(disable : 4302)
-
-//GAMEPLAY::GET_HEADING_FROM_VECTOR_2D
-// OBJECT::_GET_OBJECT_OFFSET_FROM_COORDS
-// GAMEPLAY::GET_ANGLE_BETWEEN_2D_VECTORS
-// GAMEPLAY::GET_HEADING_FROM_VECTOR_2D
 
 std::random_device random_device; std::mt19937 generator(random_device()); // init a standard mersenne_twister_engine
 uint times_waited = 0;
@@ -60,6 +56,7 @@ uint number_of_guards_to_spawn;
 
 // debug options
 LogLevel logging_level;
+bool debug_enable;
 uint seconds_to_wait_for_vehicle_persistence_scripts, vehicle_search_range_minimum;
 uint maximum_number_of_spawn_points, maximum_number_of_vehicle_models, distance_to_draw_spawn_points;
 bool dump_parked_cars_to_xyz_file;
@@ -82,11 +79,10 @@ inline bool IsControlJustReleased(eControl control) {
 	return CONTROLS::IS_DISABLED_CONTROL_JUST_RELEASED(2, control);
 }
 
-inline void NotifyBottomCenter(char* message) {
-	
+inline void NotifyBottomCenter(char* message, unsigned duration) {
 	UI::BEGIN_TEXT_COMMAND_PRINT("STRING");
 	UI::ADD_TEXT_COMPONENT_SUBSTRING_PLAYER_NAME(message);
-	UI::END_TEXT_COMMAND_PRINT(6666, 1);
+	UI::END_TEXT_COMMAND_PRINT(duration, 1);
 	Logger.Write("NotifyBottomCenter(): " + std::string(message), LogVerbose);
 }
 
@@ -244,7 +240,7 @@ inline int GetVehicleClassBitwiseFromHash(Hash hash) {
 }
 
 inline void SetPlayerMinimumWantedLevel(WantedLevel wanted_level) {
-	Logger.Write("SetPlayerMinimumWantedLevel()", LogLudicrous);
+	Logger.Write("SetPlayerMinimumWantedLevel()", LogVerbose);
 	if (PLAYER::GET_PLAYER_WANTED_LEVEL(player) < wanted_level) {
 		PLAYER::SET_PLAYER_WANTED_LEVEL(player, wanted_level, 0);
 		PLAYER::SET_PLAYER_WANTED_LEVEL_NOW(player, 1);
@@ -1053,6 +1049,56 @@ MissionType StealVehicleMission::Timeout() {
 	return StealVehicle;
 }
 
+class SelfDefenseMission {
+public:
+	MissionType Prepare();
+	MissionType Execute();
+	MissionType Timeout();
+private:
+	Ped assassin_ped_;
+	Blip assassin_blip_;
+};
+
+MissionType SelfDefenseMission::Prepare() {
+	Logger.Write( "SelfDefenseMission::Prepare()", LogNormal );
+	Vector4 assassin_spawn_position = SelectASpawnPoint( player_position, vehicle_spawn_points, reserved_vehicle_spawn_points, spawn_point_maximum_range, spawn_point_minimum_range, NULL );
+	if ( assassin_spawn_position.x == 0.0f && assassin_spawn_position.y == 0.0f && assassin_spawn_position.z == 0.0f && assassin_spawn_position.h == 0.0f ) return NO_Mission;
+	assassin_ped_ = PED::CREATE_RANDOM_PED( assassin_spawn_position.x, assassin_spawn_position.y, assassin_spawn_position.z );
+	while ( !ENTITY::DOES_ENTITY_EXIST( assassin_ped_ ) ) Wait( 0 );
+	PED::SET_PED_DESIRED_HEADING( assassin_ped_, assassin_spawn_position.h );
+	assassin_blip_ = UI::ADD_BLIP_FOR_ENTITY( assassin_ped_ );
+	AI::TASK_WANDER_STANDARD( assassin_ped_, 1000.0f, 0 );
+	if ( use_default_blip ) UI::SET_BLIP_SPRITE( assassin_blip_, 1 );
+	else UI::SET_BLIP_SPRITE( assassin_blip_, 432 );
+	UI::SET_BLIP_COLOUR( assassin_blip_, 1 );
+	UI::SET_BLIP_DISPLAY( assassin_blip_, ( char )"you will never see this" );
+	CreateNotification( "A hit has been placed on a ~r~target~w~.", play_notification_beeps );
+	return Assassination;
+}
+
+MissionType SelfDefenseMission::Execute() {
+	if ( ENTITY::IS_ENTITY_DEAD( assassin_ped_ ) ) {
+		UI::REMOVE_BLIP( &assassin_blip_ );
+		ENTITY::SET_PED_AS_NO_LONGER_NEEDED( &assassin_ped_ );
+		ChangeMoneyForCurrentPlayer( GetFromUniformIntDistribution( 5, 25 ) * 1000, mission_reward_modifier );
+		CreateNotification( "The ~r~target~w~ has been eliminated.", play_notification_beeps );
+		return NO_Mission;
+	}
+	return Assassination;
+}
+
+MissionType SelfDefenseMission::Timeout() {
+	Vector3 target_coordinates = ENTITY::GET_ENTITY_COORDS( assassin_ped_, 0 );
+	uint distance_to_target = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS( target_coordinates.x, target_coordinates.y, target_coordinates.z, player_position.x, player_position.y, player_position.z, 0 );
+	if ( distance_to_target > mission_minimum_range_for_timeout || ENTITY::IS_ENTITY_DEAD( player_ped ) ) {
+		CreateNotification( "The contract on the ~r~target~w~ has expired.", play_notification_beeps );
+		UI::REMOVE_BLIP( &assassin_blip_ );
+		ENTITY::SET_PED_AS_NO_LONGER_NEEDED( &assassin_ped_ );
+		return NO_Mission;
+	}
+	return Assassination;
+}
+
 class BadGuyHandler {
 public:
 	Ped CreateABadGuy(Vector4 origin_vector = player_position, char * skin = "mp_g_m_pros_01", float x_margin = 1.0, float y_margin = 1.0, float z_margin = 0.0, char * weapon = "SURPRISE_ME");
@@ -1222,9 +1268,11 @@ void InputHandler() {
 	if (IsControlPressed(ControlScriptPadDown) && IsControlJustReleased(ControlScriptRS)) {
 		Logger.Write("InputHandler(): (IsControlPressed(ControlScriptPadDown) && IsControlJustReleased(ControlScriptRS))", LogVerbose);
 		
-		CreateNotification("saving point to file", play_notification_beeps);
-		crate_spawn_points.push_back(player_position);
-		crate_spawn_file << std::setprecision(9) << player_position.x << " , " << player_position.y << " , " << player_position.z << std::endl;
+		if ( debug_enable ) {
+			CreateNotification( "saving point to file", play_notification_beeps );
+			crate_spawn_points.push_back( player_position );
+			crate_spawn_file << std::setprecision( 9 ) << player_position.x << " , " << player_position.y << " , " << player_position.z << std::endl;
+		}
 
 		//CreateNotification("WITH COLLISION", play_notification_beeps);
 		//crate_hash = GAMEPLAY::GET_HASH_KEY("prop_box_ammo04a");
@@ -1252,9 +1300,7 @@ void InputHandler() {
 		
 	}
 	if (IsControlPressed(ControlScriptPadDown) && IsControlJustReleased(ControlScriptRB)) {
-
-		crate_spawn_blips_current_state = ToggleCrateSpawnBlips(crate_spawn_blips_current_state);
-
+		if ( debug_enable ) crate_spawn_blips_current_state = ToggleCrateSpawnBlips(crate_spawn_blips_current_state);
 
 		//CreateNotification("WITHOUT COLLISION", play_notification_beeps);
 		//crate_hash = GAMEPLAY::GET_HASH_KEY("prop_box_ammo04a");
@@ -1265,14 +1311,10 @@ void InputHandler() {
 		//ENTITY::SET_ENTITY_ALPHA(crate, 255, 1);
 		//crate_blip = UI::ADD_BLIP_FOR_ENTITY(crate);
 
-
 		/*STREAMING::REQUEST_COLLISION_FOR_MODEL(crate_hash);
 		while (!STREAMING::HAS_COLLISION_FOR_MODEL_LOADED(crate_hash)) Wait(0);
 		ENTITY::SET_ENTITY_COLLISION(crate, true, true);*/
 	}
-
-
-
 	if (IsKeyDown(VK_OEM_4) && IsKeyJustUp(VK_OEM_6)) { // open then close
 		//CreateNotification("Displaying blips for crates", play_notification_beeps);
 		//for (Vector4 vec : crate_spawn_points) {
@@ -1491,6 +1533,7 @@ void GetSettingsFromIniFile() {
 	number_of_guards_to_spawn = std::min(Reader.ReadInteger("Options", "number_of_guards_to_spawn", 4), 12);
 	// DEBUG
 	logging_level = LogLevel (std::max(Reader.ReadInteger("Debug", "logging_level", 1), 1)); // right now at least, I don't want to let anyone turn logging entirely off.
+	debug_enable = Reader.ReadBoolean( "Debug", "debug_enable", false );
 	seconds_to_wait_for_vehicle_persistence_scripts = Reader.ReadInteger("Debug", "seconds_to_wait_for_vehicle_persistence_scripts", 0);
 	vehicle_search_range_minimum = Reader.ReadInteger("Debug", "vehicle_search_range_minimum", 30);
 	maximum_number_of_spawn_points = Reader.ReadInteger("Debug", "maximum_number_of_spawn_points", 1000000);
@@ -1507,19 +1550,18 @@ void Init() {
 	Logger.SetLoggingLevel(logging_level);
 	WaitDuringDeathArrestOrLoading(3333);
 	UglyHackForVehiclePersistenceScripts(seconds_to_wait_for_vehicle_persistence_scripts); // UGLY HACK FOR VEHICLE PERSISTENCE!
-	if (dump_parked_cars_to_xyz_file) {
+	if (debug_enable && dump_parked_cars_to_xyz_file) {
 		std::ifstream file_exists(".\\OnlineEventsRedux.xyz");
-		if (!file_exists) {
-			xyz_file.open(".\\OnlineEventsRedux.xyz", std::fstream::in | std::fstream::out | std::fstream::app);
-			xyz_file << "name,latitude,longitude,altitude,heading" << std::endl;
-		}
+    if (!file_exists) {
+      xyz_file.open(".\\OnlineEventsRedux.xyz", std::fstream::in | std::fstream::out | std::fstream::app);
+      xyz_file << "name,latitude,longitude,altitude,heading" << std::endl;
+    }
 		else {
 			xyz_file.open(".\\OnlineEventsRedux.xyz", std::fstream::in | std::fstream::out | std::fstream::app);
 		}
 	}
 	crate_spawn_file.open(".\\crate_spawn_file.xyz", std::fstream::in | std::fstream::out | std::fstream::app);
 	PopulateCrateSpawnPoints();
-	
 }
 
 void ScriptMain() {
@@ -1550,6 +1592,7 @@ void ScriptMain() {
 
 	std::vector<double> profiles_count;
 
+
 	while (true) {
 		WAIT(0);
 		std::chrono::high_resolution_clock::time_point loop_start = std::chrono::high_resolution_clock::now();
@@ -1560,7 +1603,7 @@ void ScriptMain() {
 			double average = std::accumulate(profiles_count.begin(), profiles_count.end(), 0.0) / profiles_count.size();
 			std::string profiler_string = "ScriptMain(): profiler_duration (last " + std::to_string(profiles_count.size()) + "):  " + std::to_string(average) + "  times_waited: " + std::to_string(times_waited);
 			Logger.Write(profiler_string, LogDebug);
-			NotifyBottomCenter(&profiler_string[0]);
+			if ( debug_enable ) NotifyBottomCenter(&profiler_string[0], 6666);
 			times_waited = 0;
 			profiles_count.clear();
 		}

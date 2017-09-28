@@ -2,21 +2,17 @@
 //
 
 #include "stdafx.h"
-#include <vector>
-#include <iostream>
-#include <iomanip>
-#include <string>
-#include <ctime>
-#include <random>
-#include <windows.h>
 #include <algorithm>
 #include <ctime>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <numeric>
 #include <random>
+#include <stdint.h>
 #include <string>
 #include <vector>
-#include <fstream>
-#include <numeric>
-#include <stdint.h>
+#include <windows.h>
 
 //  Windows
 #ifdef _WIN32
@@ -52,6 +48,7 @@ std::random_device random_device;
 std::mt19937 generator( ::random_device() ); // init a standard mersenne_twister_engine
 std::vector<Vector4> vector_a;
 std::vector<Vector4> vector_b;
+unsigned duplicate_count = 0;
 //std::vector<Vector4> vector_c;
 //clock_t clicks;
 //unsigned time_stamp_counter;
@@ -79,9 +76,9 @@ inline bool GetIsDistanceBetween3DCoordsLessThan( Vector4 vec_a, Vector4 vec_b, 
 	if ( !( std::abs( vec_a.x - vec_b.x ) < distance ) ) return false;
 	if ( !( std::abs( vec_a.y - vec_b.y ) < distance ) ) return false;
 	if ( !( std::abs( vec_a.z - vec_b.z ) < distance ) ) return false;
-	if ( !std::sqrt( std::pow( vec_a.x - vec_b.x, 2 )
-		+ std::pow( vec_a.y - vec_b.y, 2 )
-		+ std::pow( vec_a.z - vec_b.z, 2 ) < distance ) ) return false;
+	//if ( !std::sqrt( std::pow( vec_a.x - vec_b.x, 2 )
+	//	+ std::pow( vec_a.y - vec_b.y, 2 )
+	//	+ std::pow( vec_a.z - vec_b.z, 2 ) < distance ) ) return false;
 	return true;
 }
 
@@ -112,6 +109,12 @@ unsigned BenchmarkGetDistanceBetween3DCoords( std::vector<Vector4> vector_a, std
 	}
 
 	time_stamp_counter = rdtsc() - time_stamp_counter;
+	if (vector_c.size() - duplicate_count != 0) {
+		cout << "!";
+	}
+	else {
+		cout << ".";
+	}
 	return time_stamp_counter;
 }
 
@@ -127,23 +130,30 @@ unsigned BenchmarkGetIsDistanceBetween3DCoordsLessThan( std::vector<Vector4> vec
 			}
 		}
 	}
-
 	time_stamp_counter = rdtsc() - time_stamp_counter;
+	if (vector_c.size() - duplicate_count != 0) {
+		cout << "!";
+	}
+	else {
+		cout << ".";
+	}
 	return time_stamp_counter;
 }
 
 int main() {
 
-	unsigned vectors_size = 400;
-	unsigned test_count = 1000;
+	unsigned vectors_size = 200;
+	unsigned test_count = 2000;
 	unsigned average = 0;
+	
 
 	clock_t clicks = clock(); unsigned time_stamp_counter = rdtsc();
 	vector_a = PopulateVectors( vector_a, vectors_size );
 	vector_b = PopulateVectors( vector_b, vectors_size * 10 );
 	for ( Vector4 v : vector_a ) {
-		if ( GetFromUniformRealDistribution( 0, 1 ) < 0.5f ) {
+		if ( GetFromUniformRealDistribution( 0, 1 ) < 0.6666f ) {
 			vector_b.push_back( v );
+			duplicate_count += 1;
 		}
 	}
 	std::random_shuffle( vector_b.begin(), vector_b.end(), myrandom );
@@ -152,20 +162,18 @@ int main() {
 	cout << "time to generate vectors: " << clicks << " clicks ( " << time_stamp_counter << " CPU cycles)" << endl;
 	cout << endl;
 
-	cout << "GetDistanceBetween3DCoords(): " << test_count << " iterations" << endl;
+	cout << "GetDistanceBetween3DCoords(): " << test_count << " iterations: ";
 	for ( unsigned i = 0; i < test_count; i++ ) {
 		samples_GetDistanceBetween3DCoords.push_back( BenchmarkGetDistanceBetween3DCoords( vector_a, vector_b ) );
-		cout << ".";
 	}
 	cout << endl;
 	unsigned average_slow = std::accumulate( samples_GetDistanceBetween3DCoords.begin(), samples_GetDistanceBetween3DCoords.end(), 0.0 ) / samples_GetDistanceBetween3DCoords.size();
 	cout << "average CPU cycles: " << average_slow << endl;
 	cout << endl;
 
-	cout << "GetIsDistanceBetween3DCoordsLessThan(): " << test_count << " iterations" << endl;
+	cout << "GetIsDistanceBetween3DCoordsLessThan(): " << test_count << " iterations: ";
 	for ( unsigned i = 0; i < test_count; i++ ) {
 		samples_GetIsDistanceBetween3DCoordsLessThan.push_back( BenchmarkGetIsDistanceBetween3DCoordsLessThan( vector_a, vector_b ) );
-		cout << ".";
 	}
 	cout << endl;
 	unsigned average_fast = std::accumulate( samples_GetIsDistanceBetween3DCoordsLessThan.begin(), samples_GetIsDistanceBetween3DCoordsLessThan.end(), 0.0 ) / samples_GetIsDistanceBetween3DCoordsLessThan.size();
@@ -174,5 +182,6 @@ int main() {
 
 	double ratio = (double)average_slow / (double)average_fast;
 	cout << "GetIsDistanceBetween3DCoordsLessThan() is approvximately " << ratio << " times faster than GetDistanceBetween3DCoords()" << endl;
+	cout << endl;
 	//system("pause");
 }

@@ -1,10 +1,5 @@
 #include "Log.h"
-#include <fstream>
-#include <string>
-#include <Windows.h>
-#include <chrono>
 #include <iomanip>
-//#include <thread>
 
 Log::Log(std::string filename, LogLevel logging_level) {
 	log_time_last_ = GetTickCount64();
