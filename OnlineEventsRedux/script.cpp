@@ -5,8 +5,10 @@
 #include "..\..\inc\INIWriter.h"
 #include "..\..\inc\keyboard.h"
 
+#include "data.h"
 #include "Log.h"
 #include "script.h"
+#include <algorithm>
 #include <chrono>
 #include <iomanip>
 #include <numeric>
@@ -15,12 +17,14 @@
 #include <sstream>
 //#include "iostream"
 //#include "strings.h"
-//#include <algorithm>
+
 //#include <cmath>
 //#include <ctime>
 //#include <ratio>
 //#include <string> // included in Log.h
-//#include <vector> // lol why don't I need to include this?
+#include <vector> // lol why don't I need to include this?
+
+
 
 CIniReader Reader(".\\OnlineEventsRedux.ini");
 Log Logger(".\\OnlineEventsRedux.log", LogNormal);

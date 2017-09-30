@@ -29,6 +29,7 @@
     <ClInclude Include="..\..\inc\enums.h" />
     <ClInclude Include="..\..\inc\natives.h" />
     <ClInclude Include="..\..\inc\types.h" />
+    <ClInclude Include="data.h" />
     <ClInclude Include="Log.h" />
     <ClInclude Include="script.h" />
   </ItemGroup>

@@ -36,6 +36,9 @@
     <ClInclude Include="..\..\inc\keyboard.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="data.h">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="include">
