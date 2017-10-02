@@ -46,6 +46,7 @@ std::vector<Vector4> special_marker_points;
 std::vector<Hash> possible_vehicle_models;
 std::set<Blip> crate_spawn_blips;
 bool crate_spawn_blips_current_state = false;
+Vector4 current_mission_objective;
 
 // preference options
 bool load_without_notification, play_notification_beeps, use_default_blip;
@@ -61,7 +62,7 @@ uint number_of_guards_to_spawn;
 LogLevel logging_level;
 bool debug_enable;
 uint seconds_to_wait_for_vehicle_persistence_scripts, vehicle_search_range_minimum;
-uint maximum_number_of_spawn_points, maximum_number_of_vehicle_models, distance_to_draw_spawn_points;
+uint maximum_number_of_spawn_points, maximum_number_of_vehicle_models, distance_to_draw_debug_markers;
 bool dump_parked_cars_to_xyz_file;
 
 inline void Wait(uint milliseconds) {
@@ -130,6 +131,11 @@ inline double GetAngleBetween2DCoords(float ax, float ay, float bx, float by) {
 inline double GetDistanceBetween2DCoords(float ax, float ay, float bx, float by) {
 	double result = std::hypot(bx - ax, by - ay);
 	//Logger.Write("GetDistanceBetween2DCoords( " + std::to_string(ax) + ", " + std::to_string(ay) + ", " + std::to_string(bx) + ", " + std::to_string(by) + " ): " + std::to_string(result), LogVerbose);
+	return result;
+}
+
+inline double GetDistanceBetween2DCoords(Vector4 a, Vector4 b) {
+	double result = std::hypot(b.x - a.x, b.y - a.y);
 	return result;
 }
 
@@ -315,7 +321,7 @@ inline std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vect
 				Vehicle this_vehicle = all_world_vehicles[i];
 				Vector4 this_vehicle_position = { GetVector4OfEntity(this_vehicle) };
 				if (DoesEntityExistAndIsNotNull(this_vehicle) &&
-					!GetIsDistanceBetween3DCoordsLessThan( player_position, this_vehicle_position, search_range_minimum) &&
+					!GetIsDistanceBetween3DCoordsLessThan( player_position, this_vehicle_position, (double)search_range_minimum) &&
 					IsVehicleDrivable(this_vehicle) && // is the vehicle a car/bike/etc and can the player start driving it?
 					IsVehicleProbablyParked(this_vehicle) && // not moving, no driver?
 					!(VEHICLE::GET_LAST_PED_IN_VEHICLE_SEAT(this_vehicle, -1) == player_ped) && // probably not previously used by the player? We can hope?
@@ -510,6 +516,7 @@ MissionType CrateDropMission::Prepare() {
 	objects_were_spawned_ = false;
 	if (crate_is_special_) CreateNotification("A ~y~special crate~w~ has been dropped.", play_notification_beeps);
 	else CreateNotification("A ~g~crate~w~ has been dropped.", play_notification_beeps);
+	current_mission_objective = crate_spawn_location_;
 	return CrateDrop;
 }
 
@@ -600,6 +607,7 @@ MissionType CrateDropMission::Execute() {
 		if (crate_is_special_) ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(50000, 150000), mission_reward_modifier);
 		else ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(25000, 75000), mission_reward_modifier);
 		CreateNotification("The drop was acquired.", play_notification_beeps);
+		current_mission_objective = Vector4{999,999,999,999};
 		return NO_Mission;
 	}
 	return CrateDrop;
@@ -619,6 +627,7 @@ MissionType CrateDropMission::Timeout() {
 		//ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_4_);
 		//ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&guard_5_);
 		CreateNotification("The ~g~crate~w~ has been claimed by smugglers.", play_notification_beeps);
+		current_mission_objective = Vector4{ 999,999,999,999 };
 		return NO_Mission;
 	}
 	return CrateDrop;
@@ -769,6 +778,7 @@ MissionType ArmoredTruckMission::Execute() {
 		ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&armored_truck_);
 		return NO_Mission;
 	}
+	current_mission_objective = truck_position;
 	return ArmoredTruck;
 }
 
@@ -780,6 +790,7 @@ MissionType ArmoredTruckMission::Timeout() {
 		ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&truck_driver_);
 		ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&armored_truck_);
 		CreateNotification("The ~b~armored truck~w~ has finished carrying cash.", play_notification_beeps);
+		current_mission_objective = Vector4{ 999,999,999,999 };
 		return NO_Mission;
 	}
 	return ArmoredTruck;
@@ -813,13 +824,16 @@ MissionType AssassinationMission::Prepare() {
 }
 
 MissionType AssassinationMission::Execute() {
+	Vector4 target_position = GetVector4OfEntity(assassination_target_);
 	if (ENTITY::IS_ENTITY_DEAD(assassination_target_)) {
 		UI::REMOVE_BLIP(&target_blip_);
 		ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&assassination_target_);
 		ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(5, 25) * 1000, mission_reward_modifier);
 		CreateNotification("The ~r~target~w~ has been eliminated.", play_notification_beeps);
+		current_mission_objective = Vector4{ 999,999,999,999 };
 		return NO_Mission;
 	}
+	current_mission_objective = target_position;
 	return Assassination;
 }
 
@@ -830,6 +844,7 @@ MissionType AssassinationMission::Timeout() {
 		CreateNotification("The contract on the ~r~target~w~ has expired.", play_notification_beeps);
 		UI::REMOVE_BLIP(&target_blip_);
 		ENTITY::SET_PED_AS_NO_LONGER_NEEDED(&assassination_target_);
+		current_mission_objective = Vector4{ 999,999,999,999 };
 		return NO_Mission;
 	}
 	return Assassination;
@@ -862,6 +877,7 @@ MissionType DestroyVehicleMission::Prepare() {
 	UI::SET_BLIP_COLOUR(vehicle_blip_, 1);
 	UI::SET_BLIP_DISPLAY(vehicle_blip_, (char)"you will never see this");
 	CreateNotification("A ~r~smuggler's vehicle~w~ has been identified.", play_notification_beeps);
+	current_mission_objective = GetVector4OfEntity(vehicle_to_destroy_);
 	return DestroyVehicle;
 }
 
@@ -883,6 +899,7 @@ MissionType DestroyVehicleMission::Timeout() {
 		CreateNotification("The ~r~smuggler vehicle~w~ has been claimed by smugglers.", play_notification_beeps);
 		UI::REMOVE_BLIP(&vehicle_blip_);
 		ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&vehicle_to_destroy_);
+		current_mission_objective = Vector4{ 999,999,999,999 };
 		return NO_Mission;
 	}
 	return DestroyVehicle;
@@ -945,6 +962,7 @@ MissionType StealVehicleMission::Prepare() {
 		CreateNotification("A special ~y~vehicle~w~ has been requested for retrieval.", play_notification_beeps);
 	}
 	mission_objective_ = GetCar;
+	current_mission_objective = GetVector4OfEntity(vehicle_to_steal_);
 	return StealVehicle;
 }
 
@@ -954,6 +972,7 @@ MissionType StealVehicleMission::Execute() {
 		if (mission_objective_ == DeliverCar) UI::REMOVE_BLIP(&drop_off_blip_);
 		UI::REMOVE_BLIP(&vehicle_blip_);
 		ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&vehicle_to_steal_);
+		current_mission_objective = Vector4{ 999,999,999,999 };
 		return NO_Mission;
 	}
 
@@ -994,6 +1013,7 @@ MissionType StealVehicleMission::Execute() {
 			mission_objective_ = FixCar;
 		}
 		GRAPHICS::DRAW_MARKER(1, drop_off_coordinates.x, drop_off_coordinates.y, drop_off_coordinates.z, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 5.0f, 5.0f, 1.0f, 204, 204, 0, 100, false, false, 2, false, false, false, false); // redraws every frame, no need to remove later
+		current_mission_objective = Vector4{ drop_off_coordinates, 0.0f };
 		Vector3 vehicle_coordinates = ENTITY::GET_ENTITY_COORDS(vehicle_to_steal_, 0);
 		float dropOffDistance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(vehicle_coordinates.x, vehicle_coordinates.y, vehicle_coordinates.z, drop_off_coordinates.x, drop_off_coordinates.y, drop_off_coordinates.z, 0);
 		if (dropOffDistance < 0.7f && PED::IS_PED_IN_VEHICLE(player_ped, vehicle_to_steal_, 0)) {
@@ -1033,6 +1053,7 @@ MissionType StealVehicleMission::Execute() {
 			UI::REMOVE_BLIP(&drop_off_blip_);
 			UI::REMOVE_BLIP(&vehicle_blip_);
 			ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&vehicle_to_steal_);
+			current_mission_objective = Vector4{ 999,999,999,999 };
 			return NO_Mission;
 		}
 	}
@@ -1047,6 +1068,7 @@ MissionType StealVehicleMission::Timeout() {
 		if (mission_objective_ == DeliverCar) UI::REMOVE_BLIP(&drop_off_blip_);
 		UI::REMOVE_BLIP(&vehicle_blip_);
 		ENTITY::SET_VEHICLE_AS_NO_LONGER_NEEDED(&vehicle_to_steal_);
+		current_mission_objective = Vector4{ 999,999,999,999 };
 		return NO_Mission;
 	}
 	return StealVehicle;
@@ -1342,21 +1364,24 @@ void Update() {
 	vehicle_spawn_points = GetParkedVehiclesFromWorld(player_ped, vehicle_spawn_points, maximum_number_of_spawn_points, vehicle_search_range_minimum);
 	possible_vehicle_models = GetVehicleModelsFromWorld(player_ped, possible_vehicle_models, maximum_number_of_vehicle_models);
 	InputHandler();
-	if (distance_to_draw_spawn_points > 0) {
+	if (debug_enable && distance_to_draw_debug_markers > 0) {
 		for (Vector4 v4 : vehicle_spawn_points) {
-			if (GetDistanceBetween2DCoords(player_position.x, player_position.y, v4.x, v4.y) < distance_to_draw_spawn_points) {
+			if (GetDistanceBetween2DCoords(player_position.x, player_position.y, v4.x, v4.y) < distance_to_draw_debug_markers) {
 				GRAPHICS::DRAW_MARKER(1, v4.x, v4.y, v4.z, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 300.0f, 0, 0, 255, 192, false, false, 2, false, false, false, false); // redraws every frame, no need to remove later
 			}
 		}
 		for (Vector4 v4 : crate_spawn_points) {
-			if (GetDistanceBetween2DCoords(player_position.x, player_position.y, v4.x, v4.y) < distance_to_draw_spawn_points) {
+			if (GetDistanceBetween2DCoords(player_position.x, player_position.y, v4.x, v4.y) < distance_to_draw_debug_markers) {
 				GRAPHICS::DRAW_MARKER(1, v4.x, v4.y, v4.z, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 300.0f, 0, 255, 0, 192, false, false, 2, false, false, false, false); // redraws every frame, no need to remove later
 			}
 		}
 		for (Vector4 v4 : special_marker_points) {
-			if (GetDistanceBetween2DCoords(player_position.x, player_position.y, v4.x, v4.y) < distance_to_draw_spawn_points) {
+			if (GetDistanceBetween2DCoords(player_position.x, player_position.y, v4.x, v4.y) < distance_to_draw_debug_markers) {
 				GRAPHICS::DRAW_MARKER(1, v4.x, v4.y, v4.z, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 300.0f, 255, 0, 255, 192, false, false, 2, false, false, false, false); // redraws every frame, no need to remove later
 			}
+		}
+		if (GetDistanceBetween2DCoords(player_position, current_mission_objective) < distance_to_draw_debug_markers) {
+			GRAPHICS::DRAW_MARKER(1, current_mission_objective.x, current_mission_objective.y, current_mission_objective.z, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.5f, 1.5f, 300.0f, 255, 255, 0, 192, false, false, 2, false, false, false, false); // redraws every frame, no need to remove later
 		}
 	}
 }
@@ -1412,7 +1437,7 @@ void GetSettingsFromIniFile() {
 	vehicle_search_range_minimum = Reader.ReadInteger("Debug", "vehicle_search_range_minimum", 30);
 	maximum_number_of_spawn_points = Reader.ReadInteger("Debug", "maximum_number_of_spawn_points", 1000000);
 	maximum_number_of_vehicle_models = Reader.ReadInteger("Debug", "maximum_number_of_vehicle_models", 1000);
-	distance_to_draw_spawn_points = std::max(Reader.ReadInteger("Debug", "distance_to_draw_spawn_points", 0), 0);
+	distance_to_draw_debug_markers = std::max(Reader.ReadInteger("Debug", "distance_to_draw_spawn_points", 0), 0);
 	dump_parked_cars_to_xyz_file = Reader.ReadBoolean("Debug", "dump_parked_cars_to_xyz_file", false);
 	return;
 }

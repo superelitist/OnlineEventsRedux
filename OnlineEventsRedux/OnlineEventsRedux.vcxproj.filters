@@ -7,6 +7,7 @@
     <ClCompile Include="..\..\inc\INIReader.cpp" />
     <ClCompile Include="..\..\inc\INIWriter.cpp" />
     <ClCompile Include="..\..\inc\keyboard.cpp" />
+    <ClCompile Include="data.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\inc\enums.h">
