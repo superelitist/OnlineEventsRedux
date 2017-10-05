@@ -193,12 +193,6 @@ inline int GetFromUniformIntDistribution(int first, int second) {
 	return result;
 }
 
-//inline bool IsTheUniverseFavorable(float probability) {
-//	bool result = (GetFromUniformRealDistribution(0, 1) <= probability);
-//	Logger.Write("IsTheUniverseFavorable(" + std::to_string(probability) + "): " + (result ? "Yes" : "No"), LogDebug);
-//	return result;
-//}
-
 inline void ChangeMoneyForCurrentPlayer(int value, float modifier) {
 	value = int(value * modifier);
 	int current_player = 99; // Code analysis claims this should be initialized. Obviously, I know that playerPed MUST resolve to 0, 1, or 2, but for the sake of technicality, I'm initializing it here. Of course, if any of those ifs ever DON'T resolve to 0, 1, or 2, I'm gonna crash anyway...
@@ -366,7 +360,41 @@ inline std::vector<Vector4> GetParkedVehiclesFromWorld(Ped ped, std::vector<Vect
 	return vector_of_vector4s;
 }
 
-inline Vector4 SelectASpawnPoint(Vector4 origin, std::vector<Vector4> vector4s_to_search, std::vector<Vector4> vector4s_to_exclude, uint max_range, uint min_range, Hash vehicle_hash) {
+/// <summary>
+/// Creates a raycast between 2 points.
+/// </summary>
+/// <param name="source">The source of the raycast.</param>
+/// <param name="target">The target of the raycast.</param>
+/// <param name="options">What type of objects the raycast should intersect with.</param>
+/// <param name="ignoreEntity">Specify an <see cref="Entity"/> that the raycast should ignore, leave null for no entities ignored.</param>
+inline bool GetSimpleRaycast( Vector3 source, Vector3 target, int options = 1, Entity ignoreEntity = NULL) {
+	
+	// UNTESTED
+	BOOL hitSomethingArg;	Vector3 hitPositionArg;	int entityHandleArg;	Vector3 surfaceNormalArg;
+	int result = WORLDPROBE::_START_SHAPE_TEST_RAY( source.x, source.y, source.z, target.x, target.y, target.z, options, ignoreEntity == NULL ? 0 : ignoreEntity, 7 );
+	Wait( 0 );
+	WORLDPROBE::GET_SHAPE_TEST_RESULT( result, &hitSomethingArg, &hitPositionArg, &surfaceNormalArg, &entityHandleArg );
+	return hitSomethingArg;
+}
+
+inline bool IsSpawnUnseenByPlayer( Vector3 location, Hash hash ) {
+	return !ENTITY::WOULD_ENTITY_BE_OCCLUDED( hash, location.x, location.y, location.z, true );
+}
+
+inline bool IsSpawnUnseenByPlayer( Vector4 location, Hash hash ) {
+	return !ENTITY::WOULD_ENTITY_BE_OCCLUDED( hash, location.x, location.y, location.z, true );
+}
+
+inline bool IsPointBehindCamera( Vector3 point ) {
+	Vector3 coord = CAM::GET_GAMEPLAY_CAM_COORD();
+	float fov = CAM::GET_GAMEPLAY_CAM_FOV();
+	float half_fov = fov / 2;
+	float angle = GetAngleBetween2DCoords(coord.x, coord.y, point.x, point.y);
+	angle = angle - ENTITY::GET_ENTITY_HEADING( player_ped );
+	return std::abs( angle ) < half_fov;
+}
+
+inline Vector4 SelectASpawnPoint(Vector4 origin, std::vector<Vector4> vector4s_to_search, std::vector<Vector4> vector4s_to_exclude, uint max_range, uint min_range, Hash entity_model_hash) {
 	Vector4 empty_spawn_point;
 	std::vector<Vector4> filtered_vector4s;
 	if (vector4s_to_search.size() == 0) { // don't bother continuing with an empty vector.
@@ -376,7 +404,7 @@ inline Vector4 SelectASpawnPoint(Vector4 origin, std::vector<Vector4> vector4s_t
 	for (Vector4 this_vector4 : vector4s_to_search) {
 		uint distance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(this_vector4.x, this_vector4.y, this_vector4.z, origin.x, origin.y, origin.z, 0);
 		bool is_between_min_and_max_range = (min_range < distance && distance < max_range);
-		bool occluded = ENTITY::WOULD_ENTITY_BE_OCCLUDED(vehicle_hash, this_vector4.x, this_vector4.y, this_vector4.z, true);
+		bool occluded = ENTITY::WOULD_ENTITY_BE_OCCLUDED(entity_model_hash, this_vector4.x, this_vector4.y, this_vector4.z, true);
 		bool occupied = GAMEPLAY::IS_POSITION_OCCUPIED(this_vector4.x, this_vector4.y, this_vector4.z, 3.5f, false, true, true, false, false, false, false);
 		bool excluded = false;
 		for (Vector4 exclude_vector4 : vector4s_to_exclude) {
@@ -421,22 +449,34 @@ inline Hash SelectAVehicleModel(std::vector<Hash> vector_of_hashes_to_search, ui
 	return selected_hash;
 }
 
-inline Ped SpawnACrateGuard(Ped skin, Vector4 crate_spawn_point, float x_margin, float y_margin, float z_margin, char * weapon) {
+inline Ped SpawnACrateGuard(Ped skin, Vector4 origin, float x_margin, float y_margin, float z_margin, char * weapon) {
 	Logger.Write("SpawnACrateGuard()", LogVerbose);
-	Vector4 spawn_point = crate_spawn_point;
-	spawn_point.x += GetFromUniformRealDistribution(-x_margin, x_margin); spawn_point.y += GetFromUniformRealDistribution(-y_margin, y_margin); spawn_point.z += GetFromUniformRealDistribution(-z_margin, z_margin);
+	Vector4 spawn_point = origin;
+	int tries = 0;
+	while ( true ) {
+		spawn_point.x = origin.x + GetFromUniformRealDistribution( -x_margin, x_margin );
+		spawn_point.y = origin.y + GetFromUniformRealDistribution( -y_margin, y_margin );
+		spawn_point.z = origin.z + GetFromUniformRealDistribution( -z_margin, z_margin );
+		float ground_z_at_spawn_point = GetGroundZAtThisLocation( spawn_point );
+		if ( ground_z_at_spawn_point == 9999 ) {
+			Vector3 closest_vehicle_node;
+			bool found_a_vehicle_node = PATHFIND::GET_CLOSEST_VEHICLE_NODE( spawn_point.x, spawn_point.y, spawn_point.z, &closest_vehicle_node, 1, 3.0f, 0.0f );
+			Wait( 0 );
+			if ( !found_a_vehicle_node ) Logger.Write( "SpawnACrateGuard() PATHFIND::GET_CLOSEST_VEHICLE_NODE() RETURNED FALSE!", LogError );
+			std::stringstream ss10; ss10 << std::fixed << std::setprecision( 2 ) << "SpawnACrateGuard() PATHFIND::GET_CLOSEST_VEHICLE_NODE (" << closest_vehicle_node.x << ", " << closest_vehicle_node.y << ", " << closest_vehicle_node.z << ")"; Logger.Write( ss10.str(), LogDebug );
+			spawn_point.x = closest_vehicle_node.x; spawn_point.y = closest_vehicle_node.y; spawn_point.z = closest_vehicle_node.z;
+		} else {
+			spawn_point.z = ground_z_at_spawn_point + 1;
+		}
+		//Vector3 gameplay_camera_location = CAM::GET_GAMEPLAY_CAM_COORD();
+		if ( IsSpawnUnseenByPlayer( spawn_point, skin ) ) {
+			break;
+		} else if ( tries > 99 ) {
+			Logger.Write( "SpawnACrateGuard(): Couldn't find a point out of sight of the player (after 100 tries)!", LogError );
+		}
 
-	float ground_z_at_spawn_point = GetGroundZAtThisLocation(spawn_point);
-	if (ground_z_at_spawn_point == 9999) {
-		Vector3 closest_vehicle_node;
-		bool found_a_vehicle_node = PATHFIND::GET_CLOSEST_VEHICLE_NODE(spawn_point.x, spawn_point.y, spawn_point.z, &closest_vehicle_node, 1, 3.0f, 0.0f);
-		if (!found_a_vehicle_node) Logger.Write("SpawnACrateGuard() PATHFIND::GET_CLOSEST_VEHICLE_NODE() RETURNED FALSE!", LogError);
-		std::stringstream ss10; ss10 << std::fixed << std::setprecision(2) << "SpawnACrateGuard() PATHFIND::GET_CLOSEST_VEHICLE_NODE (" << closest_vehicle_node.x << ", " << closest_vehicle_node.y << ", " << closest_vehicle_node.z << ")"; Logger.Write(ss10.str(), LogDebug);
-		spawn_point.x = closest_vehicle_node.x; spawn_point.y = closest_vehicle_node.y; spawn_point.z = closest_vehicle_node.z;
 	}
-	else {
-		spawn_point.z = ground_z_at_spawn_point + 1;
-	}	
+	
 	Ped bad_guy = PED::CREATE_PED(26, skin, spawn_point.x, spawn_point.y, spawn_point.z, 40, false, true);
 	OBJECT::PLACE_OBJECT_ON_GROUND_PROPERLY(bad_guy);
 	while (!ENTITY::DOES_ENTITY_EXIST(bad_guy)) Wait(0);
@@ -456,42 +496,29 @@ inline Ped SpawnACrateGuard(Ped skin, Vector4 crate_spawn_point, float x_margin,
 	}
 	WEAPON::GIVE_DELAYED_WEAPON_TO_PED(bad_guy, GAMEPLAY::GET_HASH_KEY((char *)weapon), 1000, 1);
 	WEAPON::SET_CURRENT_PED_WEAPON(bad_guy, GAMEPLAY::GET_HASH_KEY((char *)weapon), 1);
-	float relative_bearing = GetAngleBetween2DCoords(spawn_point.x, spawn_point.y, crate_spawn_point.x, crate_spawn_point.y);
-
+	float relative_bearing = GetAngleBetween2DCoords(spawn_point.x, spawn_point.y, origin.x, origin.y);
 	Vector3 point_behind = GetCoordinateByOriginBearingAndDistance(spawn_point, relative_bearing - 180, 10);
 	AI::TASK_TURN_PED_TO_FACE_COORD(bad_guy, point_behind.x, point_behind.y, point_behind.z, 120000);
-
-	//AI::OPEN_PATROL_ROUTE("miss_Ass0");
-	//AI::ADD_PATROL_ROUTE_NODE(0, "WORLD_HUMAN_GUARD_STAND", spawn_point.x + GetFromUniformRealDistribution(-x_margin, x_margin), spawn_point.y + GetFromUniformRealDistribution(-y_margin, y_margin), spawn_point.z + GetFromUniformRealDistribution(-z_margin, z_margin), 0.0, 0.0, 0.0, GAMEPLAY::GET_RANDOM_INT_IN_RANGE(1000, 2000));
-	//AI::ADD_PATROL_ROUTE_NODE(1, "WORLD_HUMAN_GUARD_STAND", spawn_point.x + GetFromUniformRealDistribution(-x_margin, x_margin), spawn_point.y + GetFromUniformRealDistribution(-y_margin, y_margin), spawn_point.z + GetFromUniformRealDistribution(-z_margin, z_margin), 0.0, 0.0, 0.0, GAMEPLAY::GET_RANDOM_INT_IN_RANGE(1000, 2000));
-	//AI::ADD_PATROL_ROUTE_NODE(2, "WORLD_HUMAN_GUARD_STAND", spawn_point.x + GetFromUniformRealDistribution(-x_margin, x_margin), spawn_point.y + GetFromUniformRealDistribution(-y_margin, y_margin), spawn_point.z + GetFromUniformRealDistribution(-z_margin, z_margin), 0.0, 0.0, 0.0, GAMEPLAY::GET_RANDOM_INT_IN_RANGE(1000, 2000));
-	//AI::ADD_PATROL_ROUTE_LINK(0, 1);
-	//AI::ADD_PATROL_ROUTE_LINK(1, 2);
-	//AI::ADD_PATROL_ROUTE_LINK(2, 0);
-	//AI::CLOSE_PATROL_ROUTE();
-	//AI::CREATE_PATROL_ROUTE();
-	//AI::TASK_PATROL(bad_guy, "miss_Ass0", 1, 1, 1);
-
-	//AI::TASK_STAND_STILL(bad_guy, 500);
-	//AI::TASK_WANDER_IN_AREA(bad_guy, spawn_point.x, spawn_point.y, spawn_point.z, 300.0f, 1077936128, 1086324736); // last two values I copped from the native scripts - they're identical in multiple places...
-	AI::TASK_WANDER_IN_AREA(bad_guy, spawn_point.x, spawn_point.y, spawn_point.z, 15.0f, 1, 1);
-	//AI::TASK_WANDER_STANDARD(bad_guy, 375.0f, 0);
-	//AI::TASK_GUARD_CURRENT_POSITION(bad_guy, 10.0f, 10.0f, 1);
-
+	float distance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS( spawn_point.x, spawn_point.y, spawn_point.z, origin.x, origin.y, origin.z, 0 );
+	AI::TASK_WANDER_IN_AREA(bad_guy, spawn_point.x, spawn_point.y, spawn_point.z, distance, distance/2, 1);
 	ENTITY::SET_ENTITY_INVINCIBLE(bad_guy, false);
 	std::stringstream ss; ss << std::fixed << std::setprecision(2) << "SpawnACrateGuard(): Ped spawned at ( " << spawn_point.x << ", " << spawn_point.y << ", " << spawn_point.z << " )"; Logger.Write(ss.str(), LogDebug);
 	return bad_guy;
 }
 
-inline void SafeRemoveBlip( Blip *blip ) {
+inline void SafelyRemoveBlip( Blip *blip ) {
 	if ( UI::DOES_BLIP_EXIST( *blip ) ) UI::REMOVE_BLIP( blip );
+	Wait( 0 );
 }
 
-inline void CleanupEntity( Entity *entity ) {
+inline void SafelyCleanupEntity( Entity *entity ) {
 	Blip blip = UI::GET_BLIP_FROM_ENTITY( *entity );
-	SafeRemoveBlip( &blip );
-	if ( ENTITY::DOES_ENTITY_EXIST( *entity ) ) ENTITY::SET_ENTITY_AS_NO_LONGER_NEEDED( entity );
-	WAIT(0);
+	SafelyRemoveBlip( &blip );
+	if ( DoesEntityExistAndIsNotNull( *entity ) ) {
+		ENTITY::SET_ENTITY_AS_MISSION_ENTITY( *entity, false, false );
+		ENTITY::SET_ENTITY_AS_NO_LONGER_NEEDED( entity );
+	}
+	Wait( 0 );
 }
 
 class CrateDropMission {
@@ -511,6 +538,7 @@ private:
 	Hash crate_hash_ = GAMEPLAY::GET_HASH_KEY("prop_box_ammo04a");
 	int max_ped_alertness_ = 0;
 	uint respawn_timer_ = 0;
+	uint respawn_quantity_ = 0;
 };
 
 MissionType CrateDropMission::Prepare() {
@@ -536,8 +564,7 @@ MissionType CrateDropMission::Prepare() {
 }
 
 MissionType CrateDropMission::Execute() {
-	switch ( current_stage_ ) {
-	case Approach:
+	if ( current_stage_ == Approach ) {
 		if ( GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS( player_position.x, player_position.y, player_position.z, crate_spawn_location_.x, crate_spawn_location_.y, crate_spawn_location_.z, 0 ) < 300 ) {
 			Logger.Write( "CrateDropMission::Execute(): Creating objects...", LogVerbose );
 			STREAMING::REQUEST_MODEL( GAMEPLAY::GET_HASH_KEY( "prop_box_ammo04a" ) );
@@ -549,7 +576,7 @@ MissionType CrateDropMission::Execute() {
 			ENTITY::SET_ENTITY_COLLISION( crate_, true, true ); // 1A9205C1B9EE827F 139FD37D
 																													//while (ENTITY::GET_ENTITY_HEIGHT(crate_, crate_spawn_location_.x, crate_spawn_location_.y, crate_spawn_location_.z, 1, 1) > 0) OBJECT::PLACE_OBJECT_ON_GROUND_PROPERLY(crate_);
 																													//ENTITY::FREEZE_ENTITY_POSITION(crate_, 1);
-			UI::REMOVE_BLIP( &crate_blip_ );
+			SafelyRemoveBlip( &crate_blip_ );
 			crate_blip_ = UI::ADD_BLIP_FOR_ENTITY( crate_ );
 			if ( use_default_blip ) UI::SET_BLIP_SPRITE( crate_blip_, 1 );
 			else UI::SET_BLIP_SPRITE( crate_blip_, 306 );
@@ -557,8 +584,7 @@ MissionType CrateDropMission::Execute() {
 			if ( crate_is_special_ ) {
 				UI::SET_BLIP_COLOUR( crate_blip_, 5 );
 				Logger.Write( "CrateDropMission::Execute(): crate is special", LogNormal );
-			}
-			else UI::SET_BLIP_COLOUR( crate_blip_, 2 );
+			} else UI::SET_BLIP_COLOUR( crate_blip_, 2 );
 			UI::SET_BLIP_DISPLAY( crate_blip_, ( char )"you will never see this" );
 			STREAMING::REQUEST_MODEL( skin_ );
 			//Logger.Write("CrateDropMission::Execute(): requested model of bad guy", LogNormal);
@@ -570,52 +596,48 @@ MissionType CrateDropMission::Execute() {
 				Logger.Write( "CrateDropMission::Execute(): spawning a bad guy", LogNormal );
 				guards_.insert( SpawnACrateGuard( skin_, crate_spawn_location_, 11, 11, 11, "SURPRISE_ME" ) );
 			}
+
 			Logger.Write( "CrateDropMission::Execute(): guards were spawned", LogNormal );
 			current_stage_ = Fighting;
 		}
-		return CrateDrop;
-	case Fighting:
-		if ( ENTITY::DOES_ENTITY_EXIST( crate_ ) ) {
-			uint num_guard_to_respawn = 0;
-			for ( Ped guard : guards_ ) {
-				if ( PED::GET_PED_ALERTNESS( guard ) < max_ped_alertness_ ) PED::SET_PED_ALERTNESS( guard, max_ped_alertness_ ); // alert each guard to highest level among them
-				max_ped_alertness_ = std::max( max_ped_alertness_, PED::GET_PED_ALERTNESS( guard ) );
-				Blip blip = UI::GET_BLIP_FROM_ENTITY( guard );
-				if ( PED::IS_PED_DEAD_OR_DYING( guard, 1 ) ) { // death cleanup
-					Logger.Write( "CrateDropMission::Execute(): Guard is dead or dying, trying to delete ped and blip...", LogDebug );
-					guards_.erase( guard );
-					CleanupEntity( &guard );
-					num_guard_to_respawn += 1;
-					if ( respawn_timer_ == 0 ) {
-						respawn_timer_ = GetTickCount64() + time_between_guard_respawns;
-					} else {
-						respawn_timer_ += time_between_guard_respawns;
-					}
-					
-				}
-				if ( ENTITY::HAS_ENTITY_CLEAR_LOS_TO_ENTITY_IN_FRONT( player_ped, guard ) ) { // blip visibility add/remove
-					if ( !UI::DOES_BLIP_EXIST( blip ) ) {
-						Blip blip = UI::ADD_BLIP_FOR_ENTITY( guard );
-						UI::SET_BLIP_SCALE( blip, 0.75f );
-					}
-				} else if ( UI::DOES_BLIP_EXIST( blip ) ) UI::REMOVE_BLIP( &blip );
-			}
-			for ( uint i = 0; i < num_guard_to_respawn; i++ ) {
-				if ( GetTickCount64() - respawn_timer_ > 0 ) {
-					respawn_timer_ = 0;
-					STREAMING::REQUEST_MODEL( skin_ );
-					while ( !STREAMING::HAS_MODEL_LOADED( skin_ ) ) Wait( 0 );
-					guards_.insert( SpawnACrateGuard( skin_, crate_spawn_location_, 33, 33, 33, "SURPRISE_ME" ) );
-				}
-			}
-		}
-		else {
-			current_stage_ = Cleanup;
-		}
-	case Cleanup:
+	}
+	if ( current_stage_ == Fighting ) {
 		for ( Ped guard : guards_ ) {
-			CleanupEntity( &guard );
+			if ( PED::GET_PED_ALERTNESS( guard ) < max_ped_alertness_ ) PED::SET_PED_ALERTNESS( guard, max_ped_alertness_ ); // alert each guard to highest level among them
+			max_ped_alertness_ = std::max( max_ped_alertness_, PED::GET_PED_ALERTNESS( guard ) );
+			Blip blip = UI::GET_BLIP_FROM_ENTITY( guard );
+			if ( PED::IS_PED_DEAD_OR_DYING( guard, 1 ) ) { // death cleanup
+				Logger.Write( "CrateDropMission::Execute(): Guard is dead or dying, trying to delete ped and blip...", LogDebug );
+				guards_.erase( guard );
+				SafelyCleanupEntity( &guard );
+				respawn_quantity_ += 1;
+				if ( respawn_timer_ == 0 ) {
+					respawn_timer_ = GetTickCount64() + time_between_guard_respawns;
+				} else {
+					respawn_timer_ += time_between_guard_respawns;
+				}
+
+			}
+			if ( ENTITY::HAS_ENTITY_CLEAR_LOS_TO_ENTITY_IN_FRONT( player_ped, guard ) ) { // blip visibility add/remove
+				if ( !UI::DOES_BLIP_EXIST( blip ) ) {
+					Blip blip = UI::ADD_BLIP_FOR_ENTITY( guard );
+					UI::SET_BLIP_SCALE( blip, 0.75f );
+				}
+			} else SafelyRemoveBlip( &blip );
 		}
+		for ( uint i = 0; i < respawn_quantity_; i++ ) {
+			if ( GetTickCount64() - respawn_timer_ > 0 ) {
+				respawn_timer_ = 0;
+				uint respawn_quantity_ = 0;
+				STREAMING::REQUEST_MODEL( skin_ );
+				while ( !STREAMING::HAS_MODEL_LOADED( skin_ ) ) Wait( 0 );
+				guards_.insert( SpawnACrateGuard( skin_, crate_spawn_location_, 33, 33, 33, "SURPRISE_ME" ) );
+			}
+		}
+		if ( !ENTITY::DOES_ENTITY_EXIST( crate_ ) ) current_stage_ = Cleanup;
+	}
+	if ( current_stage_ == Cleanup ) {
+		for ( Ped guard : guards_ ) SafelyCleanupEntity( &guard );
 		guards_.clear();
 		if ( crate_is_special_ ) ChangeMoneyForCurrentPlayer( GetFromUniformIntDistribution( 50000, 150000 ), mission_reward_modifier );
 		else ChangeMoneyForCurrentPlayer( GetFromUniformIntDistribution( 25000, 75000 ), mission_reward_modifier );
@@ -623,14 +645,15 @@ MissionType CrateDropMission::Execute() {
 		current_mission_objective = Vector4{ 999,999,999,999 };
 		return NO_Mission;
 	}
+	return CrateDrop;	
 }
 
 MissionType CrateDropMission::Timeout() {
 	uint distance_to_crate = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_position.x, player_position.y, player_position.z, crate_spawn_location_.x, crate_spawn_location_.y, crate_spawn_location_.z, 0);
 	if (distance_to_crate > mission_minimum_range_for_timeout || ENTITY::IS_ENTITY_DEAD(player_ped)) {
-		CleanupEntity( &crate_ );
+		SafelyCleanupEntity( &crate_ );
 		for (Ped guard : guards_) {
-			CleanupEntity( &guard );
+			SafelyCleanupEntity( &guard );
 		}
 		CreateNotification("The ~g~crate~w~ has been claimed by smugglers.", play_notification_beeps);
 		current_mission_objective = Vector4{ 999,999,999,999 };
@@ -735,8 +758,8 @@ MissionType ArmoredTruckMission::Execute() {
 
 	if (!VEHICLE::IS_VEHICLE_DRIVEABLE(armored_truck_, 1)) {
 		CreateNotification("The ~b~armored truck~w~ has been destroyed. The cash cases inside have been ruined.", play_notification_beeps);
-		CleanupEntity( &truck_driver_ );
-		CleanupEntity( &armored_truck_ );
+		SafelyCleanupEntity( &truck_driver_ );
+		SafelyCleanupEntity( &armored_truck_ );
 		return NO_Mission;
 	}
 
@@ -764,19 +787,19 @@ MissionType ArmoredTruckMission::Execute() {
 		case 0:
 			SetPlayerMinimumWantedLevel(Wanted_Three);
 			case3 = OBJECT::CREATE_AMBIENT_PICKUP(0xDE78F17E, behind_truck.x-0.25, behind_truck.y-0.25, behind_truck.z + 1, -1, GetFromUniformIntDistribution(5, 25) * 1000 * mission_reward_modifier, 0, 1, 1);
-			CleanupEntity( &case3 );
+			SafelyCleanupEntity( &case3 );
 		case 1:
 			SetPlayerMinimumWantedLevel(Wanted_Two);
 			case2 = OBJECT::CREATE_AMBIENT_PICKUP(0xDE78F17E, behind_truck.x+0.25, behind_truck.y+0.25, behind_truck.z + 1, -1, GetFromUniformIntDistribution(5, 25) * 1000 * mission_reward_modifier, 0, 1, 1);
-			CleanupEntity( &case2 );
+			SafelyCleanupEntity( &case2 );
 		case 2:
 			SetPlayerMinimumWantedLevel(Wanted_One);
 			case1 = OBJECT::CREATE_AMBIENT_PICKUP(0xDE78F17E, behind_truck.x, behind_truck.y, behind_truck.z + 1, -1, GetFromUniformIntDistribution(5, 25) * 1000 * mission_reward_modifier, 0, 1, 1);
-			CleanupEntity( &case1 );
+			SafelyCleanupEntity( &case1 );
 		}
 		CreateNotification("The ~b~armored truck's~w~ doors have been opened. Cash has been dropped.", play_notification_beeps);
-		CleanupEntity( &truck_driver_ );
-		CleanupEntity( &armored_truck_ );
+		SafelyCleanupEntity( &truck_driver_ );
+		SafelyCleanupEntity( &armored_truck_ );
 		return NO_Mission;
 	}
 	current_mission_objective = truck_position;
@@ -787,8 +810,8 @@ MissionType ArmoredTruckMission::Timeout() {
 	Vector3 truck_coordinates = ENTITY::GET_ENTITY_COORDS(armored_truck_, 0);
 	uint distance_to_truck = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(truck_coordinates.x, truck_coordinates.y, truck_coordinates.z, player_position.x, player_position.y, player_position.z, 0);
 	if (distance_to_truck > mission_minimum_range_for_timeout || ENTITY::IS_ENTITY_DEAD(player_ped)) {
-		CleanupEntity( &truck_driver_ );
-		CleanupEntity( &armored_truck_ );
+		SafelyCleanupEntity( &truck_driver_ );
+		SafelyCleanupEntity( &armored_truck_ );
 		CreateNotification("The ~b~armored truck~w~ has finished carrying cash.", play_notification_beeps);
 		current_mission_objective = Vector4{ 999,999,999,999 };
 		return NO_Mission;
@@ -826,7 +849,7 @@ MissionType AssassinationMission::Prepare() {
 MissionType AssassinationMission::Execute() {
 	Vector4 target_position = GetVector4OfEntity(assassination_target_);
 	if (ENTITY::IS_ENTITY_DEAD(assassination_target_)) {
-		CleanupEntity( &assassination_target_ );
+		SafelyCleanupEntity( &assassination_target_ );
 		ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(5, 25) * 1000, mission_reward_modifier);
 		CreateNotification("The ~r~target~w~ has been eliminated.", play_notification_beeps);
 		current_mission_objective = Vector4{ 999,999,999,999 };
@@ -841,7 +864,7 @@ MissionType AssassinationMission::Timeout() {
 	uint distance_to_target = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(target_coordinates.x, target_coordinates.y, target_coordinates.z, player_position.x, player_position.y, player_position.z, 0);
 	if (distance_to_target > mission_minimum_range_for_timeout || ENTITY::IS_ENTITY_DEAD(player_ped)) {
 		CreateNotification("The contract on the ~r~target~w~ has expired.", play_notification_beeps);
-		CleanupEntity( &assassination_target_ );
+		SafelyCleanupEntity( &assassination_target_ );
 		current_mission_objective = Vector4{ 999,999,999,999 };
 		return NO_Mission;
 	}
@@ -881,7 +904,7 @@ MissionType DestroyVehicleMission::Prepare() {
 
 MissionType DestroyVehicleMission::Execute() {
 	if (!VEHICLE::IS_VEHICLE_DRIVEABLE(vehicle_to_destroy_, 1)) {
-		CleanupEntity( &vehicle_to_destroy_ );
+		SafelyCleanupEntity( &vehicle_to_destroy_ );
 		ChangeMoneyForCurrentPlayer(GetFromUniformIntDistribution(5, 25) * 1000, mission_reward_modifier);
 		CreateNotification("~r~Vehicle~w~ destroyed.", play_notification_beeps);
 		return NO_Mission;
@@ -894,7 +917,7 @@ MissionType DestroyVehicleMission::Timeout() {
 	uint vehicleDistance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(vehicle_coordinates.x, vehicle_coordinates.y, vehicle_coordinates.z, player_position.x, player_position.y, player_position.z, 0);
 	if (vehicleDistance > mission_minimum_range_for_timeout || ENTITY::IS_ENTITY_DEAD(player_ped)) {
 		CreateNotification("The ~r~smuggler vehicle~w~ has been claimed by smugglers.", play_notification_beeps);
-		CleanupEntity( &vehicle_to_destroy_ );
+		SafelyCleanupEntity( &vehicle_to_destroy_ );
 		current_mission_objective = Vector4{ 999,999,999,999 };
 		return NO_Mission;
 	}
@@ -938,7 +961,6 @@ MissionType StealVehicleMission::Prepare() {
 	while (!STREAMING::HAS_MODEL_LOADED(vehicle_hash_)) Wait(0);
 	vehicle_to_steal_ = VEHICLE::CREATE_VEHICLE(vehicle_hash_, vehicle_spawn_position.x, vehicle_spawn_position.y, vehicle_spawn_position.z, vehicle_spawn_position.h, 0, 0);
 	VEHICLE::SET_VEHICLE_ON_GROUND_PROPERLY(vehicle_to_steal_);
-	//if (IsTheUniverseFavorable(1.0)) VEHICLE::SET_VEHICLE_IS_STOLEN(vehicle_to_steal_, true); // doesn't work.
 	if (GetFromUniformRealDistribution(0, 1) <= (0.6666)) VEHICLE::SET_VEHICLE_DOORS_LOCKED(vehicle_to_steal_, 7);
 	if (GetFromUniformRealDistribution(0, 1) <= (0.6666)) VEHICLE::SET_VEHICLE_NEEDS_TO_BE_HOTWIRED(vehicle_to_steal_, true);
 	vehicle_blip_ = UI::ADD_BLIP_FOR_ENTITY(vehicle_to_steal_);
@@ -965,8 +987,8 @@ MissionType StealVehicleMission::Prepare() {
 MissionType StealVehicleMission::Execute() {
 	if (!VEHICLE::IS_VEHICLE_DRIVEABLE(vehicle_to_steal_, 1)) {
 		CreateNotification("The ~y~vehicle~w~ has been destroyed.", play_notification_beeps);
-		if (mission_objective_ == DeliverCar) UI::REMOVE_BLIP(&drop_off_blip_);
-		CleanupEntity( &vehicle_to_steal_ );
+		if (mission_objective_ == DeliverCar) SafelyRemoveBlip(&drop_off_blip_);
+		SafelyCleanupEntity( &vehicle_to_steal_ );
 		current_mission_objective = Vector4{ 999,999,999,999 };
 		return NO_Mission;
 	}
@@ -1045,8 +1067,8 @@ MissionType StealVehicleMission::Execute() {
 			float reward_modifier = GetFromUniformRealDistribution(-0.5f, 1.5f); // you lose some, you win some more.
 			ChangeMoneyForCurrentPlayer(int(reward_amount_by_class * reward_modifier), mission_reward_modifier); // who cares about rounding errors?
 			CreateNotification("The ~y~vehicle~w~ has been delivered.", play_notification_beeps);
-			SafeRemoveBlip( &drop_off_blip_ );
-			CleanupEntity( &vehicle_to_steal_ );
+			SafelyRemoveBlip( &drop_off_blip_ );
+			SafelyCleanupEntity( &vehicle_to_steal_ );
 			current_mission_objective = Vector4{ 999,999,999,999 };
 			return NO_Mission;
 		}
@@ -1059,8 +1081,8 @@ MissionType StealVehicleMission::Timeout() {
 	uint vehicleDistance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(vehicle_coordinates.x, vehicle_coordinates.y, vehicle_coordinates.z, player_position.x, player_position.y, player_position.z, 0);
 	if (vehicleDistance > mission_minimum_range_for_timeout || ENTITY::IS_ENTITY_DEAD(player_ped)) {
 		CreateNotification("The ~y~special vehicle~w~ is no longer requested.", play_notification_beeps);
-		if ( mission_objective_ == DeliverCar ) SafeRemoveBlip( &drop_off_blip_ );
-		CleanupEntity( &vehicle_to_steal_ );
+		if ( mission_objective_ == DeliverCar ) SafelyRemoveBlip( &drop_off_blip_ );
+		SafelyCleanupEntity( &vehicle_to_steal_ );
 		current_mission_objective = Vector4{ 999,999,999,999 };
 		return NO_Mission;
 	}
@@ -1096,7 +1118,7 @@ MissionType SelfDefenseMission::Prepare() {
 
 MissionType SelfDefenseMission::Execute() {
 	if ( ENTITY::IS_ENTITY_DEAD( assassin_ped_ ) ) {
-		CleanupEntity( &assassin_ped_ );
+		SafelyCleanupEntity( &assassin_ped_ );
 		ChangeMoneyForCurrentPlayer( GetFromUniformIntDistribution( 5, 25 ) * 1000, mission_reward_modifier );
 		CreateNotification( "The ~r~target~w~ has been eliminated.", play_notification_beeps );
 		return NO_Mission;
@@ -1109,7 +1131,7 @@ MissionType SelfDefenseMission::Timeout() {
 	uint distance_to_target = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS( target_coordinates.x, target_coordinates.y, target_coordinates.z, player_position.x, player_position.y, player_position.z, 0 );
 	if ( distance_to_target > mission_minimum_range_for_timeout || ENTITY::IS_ENTITY_DEAD( player_ped ) ) {
 		CreateNotification( "The contract on the ~r~target~w~ has expired.", play_notification_beeps );
-		CleanupEntity( &assassin_ped_ );
+		SafelyCleanupEntity( &assassin_ped_ );
 		return NO_Mission;
 	}
 	return Assassination;
@@ -1171,7 +1193,7 @@ Ped BadGuyHandler::CreateABadGuy(Vector4 origin_vector, char * skin, float x_mar
 bool BadGuyHandler::RemoveABadGuy(Ped bad_guy)
 {
 	if (bad_guys_.find(bad_guy) != bad_guys_.end()) {
-		CleanupEntity( &bad_guy );
+		SafelyCleanupEntity( &bad_guy );
 		bad_guys_.erase(bad_guy);
 		return true;
 	}
@@ -1192,7 +1214,7 @@ bool BadGuyHandler::RemoveABadGuySquad(std::set<Ped> squad)
 {
 	if (bad_guy_squads_.find(squad) != bad_guy_squads_.end()) {
 		for (Ped each_bad_guy : squad) {
-			CleanupEntity( &each_bad_guy );
+			SafelyCleanupEntity( &each_bad_guy );
 		}
 		bad_guy_squads_.erase(squad);
 		return true;
@@ -1273,7 +1295,7 @@ bool ToggleCrateSpawnBlips(bool current_state) {
 	if (current_state) { // blips are on
 		CreateNotification("Removing blips for crates", play_notification_beeps);
 		for (Blip this_blip : crate_spawn_blips) {
-			UI::REMOVE_BLIP(&this_blip);
+			SafelyRemoveBlip(&this_blip);
 			crate_spawn_blips.erase(this_blip);
 		}
 	}
@@ -1342,7 +1364,7 @@ void InputHandler() {
 	if (IsKeyDown(VK_OEM_6) && IsKeyJustUp(VK_OEM_4)) { // close then open
 		//CreateNotification("Removing blips for crates", play_notification_beeps);
 		//for (Blip this_blip : crate_spawn_blips) {
-		//	UI::REMOVE_BLIP(&this_blip);
+		//	SafelyRemoveBlip(&this_blip);
 		//	crate_spawn_blips.erase(this_blip);
 		//}
 	}
