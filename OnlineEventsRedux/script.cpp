@@ -115,18 +115,26 @@ inline Vector3 GetCoordinateByOriginBearingAndDistance(Vector4 v4, float bearing
 	//Vector3 v3;	
 	//v3.x = v4.x + cos((bearing)*radian) * distance; v3.y = v4.y + sin((bearing)*radian) * distance; v3.z = v4.z;
 	Vector3 result = Vector3{ static_cast<float>(v4.x + cos((bearing)*radian) * distance), 0 , static_cast<float>(v4.y + sin((bearing)*radian) * distance), 0, static_cast<float>(v4.z), 0 };
-	Logger.Write("GetCoordinatesByOriginBearingAndDistance( (" + std::to_string(v4.x) + ", " + std::to_string(v4.y) + ", " + std::to_string(v4.z) + "), " + std::to_string(bearing) + ", " + std::to_string(distance) 
-																				+ " ): (" + std::to_string(result.x) + ", " + std::to_string(result.y) + ", " + std::to_string(result.z) + " )", LogDebug);
+	std::stringstream ss;
+	ss << std::setprecision(6) << "GetCoordinatesByOriginBearingAndDistance( (" << v4.x << ", " << v4.y << ", " << v4.z << "), " << bearing << ", " << distance << " ): (" << result.x << ", " << result.y << ", " << result.z << " )";
+	Logger.Write(ss.str(), LogDebug);
 	return result;
 }
 
 inline double GetAngleBetween2DCoords(float ax, float ay, float bx, float by) {
 	float x_diff = bx - ax;
 	float y_diff = by - ay;
-	double theta = atan2(y_diff, x_diff);
+	double theta = atan2(x_diff, y_diff);
 	double result = theta / radian;
 	Logger.Write("GetAngleBetween2DCoords( " + std::to_string(ax) + ", " + std::to_string(ay) + ", " + std::to_string(bx) + ", " + std::to_string(by) + " ): " + std::to_string(result), LogDebug);
 	return result;
+}
+
+double NormalizeToDegrees(double x) {
+	x = fmod(x, 360);
+	if (x < 0)
+		x += 360;
+	return x;
 }
 
 inline double GetDistanceBetween2DCoords(float ax, float ay, float bx, float by) {
@@ -163,7 +171,7 @@ inline bool GetIsDistanceBetween3DCoordsLessThan( Vector4 vec_a, Vector4 vec_b, 
 }
 
 inline float GetGroundZAtThisLocation(Vector4 v4) {
-	if (v4.z > 1000.0f) {
+	if (v4.z > 100.0f) {
 		Logger.Write("GetGroundZAtThisLocation(): v4.z is already over 1000, something went wrong!", LogError);
 		return 9999;
 	}
@@ -175,14 +183,14 @@ inline float GetGroundZAtThisLocation(Vector4 v4) {
 		//Wait(0);
 		ground_z0 = GetGroundZAtThisLocation(v4);
 	}
-	std::stringstream ss; ss << std::fixed << std::setprecision(2) << "GetGroundZAtThisLocation(" << v4.x << ", " << v4.y << ", " << v4.z << ") GroundZ(0): " << ground_z0; Logger.Write(ss.str(), LogDebug);
+	//std::stringstream ss; ss << std::fixed << std::setprecision(2) << "GetGroundZAtThisLocation(" << v4.x << ", " << v4.y << ", " << v4.z << ") GroundZ(0): " << ground_z0; Logger.Write(ss.str(), LogDebug);
 	return ground_z0;
 }
 
 inline double GetFromUniformRealDistribution(double first, double second) {
 	std::uniform_real_distribution<> uniform_real_distribution(first, second);
 	double result =  uniform_real_distribution(generator);
-	Logger.Write("GetFromUniformRealDistribution( " + std::to_string(first) + ", " + std::to_string(second) + " ): " + std::to_string(result), LogDebug);
+	//Logger.Write("GetFromUniformRealDistribution( " + std::to_string(first) + ", " + std::to_string(second) + " ): " + std::to_string(result), LogDebug);
 	return result;
 }
 
@@ -471,9 +479,14 @@ inline Ped SpawnACrateGuard(Ped skin, Vector4 origin, float x_margin, float y_ma
 		//Vector3 gameplay_camera_location = CAM::GET_GAMEPLAY_CAM_COORD();
 		if ( IsSpawnUnseenByPlayer( spawn_point, skin ) ) {
 			break;
-		} else if ( tries > 99 ) {
+		} else if ( tries > 9 ) {
 			Logger.Write( "SpawnACrateGuard(): Couldn't find a point out of sight of the player (after 100 tries)!", LogError );
 		}
+		//float bearing = NormalizeToDegrees(GetAngleBetween2DCoords(player_position.x, player_position.y, 0, 0) + player_position.h);
+		/*float min_angle = CAM::GET_GAMEPLAY_CAM_FOV() / 2;
+		float max_angle = 360 - CAM::GET_GAMEPLAY_CAM_FOV() / 2;
+		Vector3 spawn = GetCoordinateByOriginBearingAndDistance(player_position, GetFromUniformRealDistribution(min_angle, max_angle), GetFromUniformRealDistribution(11, 33));
+		UI::ADD_BLIP_FOR_COORD(spawn.x, spawn.y, spawn.z);*/
 
 	}
 	
@@ -537,7 +550,7 @@ private:
 	Ped skin_ = GAMEPLAY::GET_HASH_KEY("mp_g_m_pros_01");
 	Hash crate_hash_ = GAMEPLAY::GET_HASH_KEY("prop_box_ammo04a");
 	int max_ped_alertness_ = 0;
-	uint respawn_timer_ = 0;
+	ULONGLONG respawn_timer_ = 0;
 	uint respawn_quantity_ = 0;
 };
 
@@ -558,6 +571,8 @@ MissionType CrateDropMission::Prepare() {
 	UI::SET_BLIP_DISPLAY(crate_blip_, (char)"you will never see this");
 	if (crate_is_special_) CreateNotification("A ~y~special crate~w~ has been dropped.", play_notification_beeps);
 	else CreateNotification("A ~g~crate~w~ has been dropped.", play_notification_beeps);
+	STREAMING::REQUEST_MODEL(skin_);
+	while (!STREAMING::HAS_MODEL_LOADED(skin_)) Wait(0);
 	current_mission_objective = crate_spawn_location_;
 	current_stage_ = Approach;
 	return CrateDrop;
@@ -605,9 +620,8 @@ MissionType CrateDropMission::Execute() {
 		for ( Ped guard : guards_ ) {
 			if ( PED::GET_PED_ALERTNESS( guard ) < max_ped_alertness_ ) PED::SET_PED_ALERTNESS( guard, max_ped_alertness_ ); // alert each guard to highest level among them
 			max_ped_alertness_ = std::max( max_ped_alertness_, PED::GET_PED_ALERTNESS( guard ) );
-			Blip blip = UI::GET_BLIP_FROM_ENTITY( guard );
+			
 			if ( PED::IS_PED_DEAD_OR_DYING( guard, 1 ) ) { // death cleanup
-				Logger.Write( "CrateDropMission::Execute(): Guard is dead or dying, trying to delete ped and blip...", LogDebug );
 				guards_.erase( guard );
 				SafelyCleanupEntity( &guard );
 				respawn_quantity_ += 1;
@@ -616,8 +630,9 @@ MissionType CrateDropMission::Execute() {
 				} else {
 					respawn_timer_ += time_between_guard_respawns;
 				}
-
+				Logger.Write("CrateDropMission::Execute(): Guard is dead or dying, respawn in " + std::to_string(respawn_timer_ - GetTickCount64()) + " milliseconds", LogDebug);
 			}
+			Blip blip = UI::GET_BLIP_FROM_ENTITY(guard);
 			if ( ENTITY::HAS_ENTITY_CLEAR_LOS_TO_ENTITY_IN_FRONT( player_ped, guard ) ) { // blip visibility add/remove
 				if ( !UI::DOES_BLIP_EXIST( blip ) ) {
 					Blip blip = UI::ADD_BLIP_FOR_ENTITY( guard );
@@ -625,15 +640,20 @@ MissionType CrateDropMission::Execute() {
 				}
 			} else SafelyRemoveBlip( &blip );
 		}
-		for ( uint i = 0; i < respawn_quantity_; i++ ) {
-			if ( GetTickCount64() - respawn_timer_ > 0 ) {
-				respawn_timer_ = 0;
-				uint respawn_quantity_ = 0;
-				STREAMING::REQUEST_MODEL( skin_ );
-				while ( !STREAMING::HAS_MODEL_LOADED( skin_ ) ) Wait( 0 );
-				guards_.insert( SpawnACrateGuard( skin_, crate_spawn_location_, 33, 33, 33, "SURPRISE_ME" ) );
+		int difference = GetTickCount64() - respawn_timer_;
+		//std::stringstream ss; ss << "CrateDropMission::Execute(): GetTickCount64(): " << GetTickCount64() << ", respawn_timer_: " << respawn_timer_ << ", difference: " << difference;
+		//Logger.Write(ss.str(), LogDebug);
+		if ( difference > 0 && respawn_quantity_ > 0 ) {
+			Logger.Write("CrateDropMission::Execute(): respawn_timer_ has elapsed. respawn_quantiy_ is: " + std::to_string(respawn_quantity_), LogDebug);
+			respawn_timer_ = 0;
+			for (uint i = 0; i < respawn_quantity_; i++) {
+				STREAMING::REQUEST_MODEL(skin_);
+				while (!STREAMING::HAS_MODEL_LOADED(skin_)) Wait(0);
+				guards_.insert(SpawnACrateGuard(skin_, crate_spawn_location_, 33, 33, 33, "SURPRISE_ME"));
 			}
+			respawn_quantity_ = 0;
 		}
+
 		if ( !ENTITY::DOES_ENTITY_EXIST( crate_ ) ) current_stage_ = Cleanup;
 	}
 	if ( current_stage_ == Cleanup ) {
@@ -651,6 +671,7 @@ MissionType CrateDropMission::Execute() {
 MissionType CrateDropMission::Timeout() {
 	uint distance_to_crate = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(player_position.x, player_position.y, player_position.z, crate_spawn_location_.x, crate_spawn_location_.y, crate_spawn_location_.z, 0);
 	if (distance_to_crate > mission_minimum_range_for_timeout || ENTITY::IS_ENTITY_DEAD(player_ped)) {
+		SafelyRemoveBlip(&crate_blip_);
 		SafelyCleanupEntity( &crate_ );
 		for (Ped guard : guards_) {
 			SafelyCleanupEntity( &guard );
@@ -1245,8 +1266,8 @@ void MissionHandler::Update() {
 	tick_count_at_last_update_ = GetTickCount64();
 	// Enough time has passed that we can start a new mission.
 	if (ticks_since_last_mission_ > ticks_between_missions_) { 
-		current_mission_type_ = MissionType(rand() % MAX_Mission); // I used to think this was silly. Now I think it's awesome.
-		//current_mission_type_ = CrateDrop;
+		//current_mission_type_ = MissionType(rand() % MAX_Mission); // I used to think this was silly. Now I think it's awesome.
+		current_mission_type_ = CrateDrop;
 		//current_mission_type_ = ArmoredTruck;
 		switch (current_mission_type_) {
 		case StealVehicle:	current_mission_type_ = StealVehicleMission.Prepare();		break; // Prepare()s should return their MissionType on success.
@@ -1368,6 +1389,15 @@ void InputHandler() {
 		//	crate_spawn_blips.erase(this_blip);
 		//}
 	}
+	if (IsControlJustReleased(ControlSprint)) {
+		
+
+		//std::stringstream ss;
+		//ss << std::setprecision(3) << "2DAngle: " << angle << " Heading: " << heading << " Bearing: " << bearing;
+		//std::string str = ss.str();
+		//char* chr = &str[0u];
+		//NotifyBottomCenter(chr, 2222);
+	}
 }
 
 void Update() {
@@ -1396,6 +1426,7 @@ void Update() {
 		if (GetDistanceBetween2DCoords(player_position, current_mission_objective) < distance_to_draw_debug_markers) {
 			GRAPHICS::DRAW_MARKER(1, current_mission_objective.x, current_mission_objective.y, current_mission_objective.z, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.5f, 1.5f, 300.0f, 255, 255, 0, 192, false, false, 2, false, false, false, false); // redraws every frame, no need to remove later
 		}
+		GRAPHICS::DRAW_MARKER(1, 0, 0, 0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.5f, 1.5f, 300.0f, 255, 255, 255, 192, false, false, 2, false, false, false, false);
 	}
 }
 
@@ -1435,7 +1466,7 @@ void GetSettingsFromIniFile() {
 	play_notification_beeps = Reader.ReadBoolean("Options", "play_notification_beeps", true);
 	use_default_blip = Reader.ReadBoolean("Options", "use_default_blip", false);
 	mission_timeout = std::max(Reader.ReadInteger("Options", "mission_timeout", 360), 180);
-	mission_cooldown = std::max(Reader.ReadInteger("Options", "mission_cooldown", 60), 30);
+	mission_cooldown = std::max(Reader.ReadInteger("Options", "mission_cooldown", 60), 5);
 	spawn_point_minimum_range = Reader.ReadInteger("Options", "spawn_point_minimum_range", 1111);
 	spawn_point_maximum_range = Reader.ReadInteger("Options", "spawn_point_maximum_range", 3333);
 	mission_minimum_range_for_timeout = Reader.ReadInteger("Options", "mission_minimum_range_for_timeout", 333);
@@ -1445,7 +1476,6 @@ void GetSettingsFromIniFile() {
 	number_of_guards_to_spawn = std::min(Reader.ReadInteger("Options", "number_of_guards_to_spawn", 4), 12);
 	time_between_guard_respawns = std::max(std::min( Reader.ReadInteger( "Options", "time_between_guard_respawns", 3333 ), 9999 ), 666); // between 666 and 9999 milliseconds
 
-	
 	// DEBUG
 	logging_level = LogLevel (std::max(Reader.ReadInteger("Debug", "logging_level", 1), 1)); // right now at least, I don't want to let anyone turn logging entirely off.
 	debug_enable = Reader.ReadBoolean( "Debug", "debug_enable", false );
